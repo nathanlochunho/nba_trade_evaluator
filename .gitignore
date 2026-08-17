@@ -1,0 +1,14 @@
+# Virtual environment
+venv/
+.venv/
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# Flet / Flutter build outputs
+build/
+.flet/
+
+# Windows temp files
+*.tmp
