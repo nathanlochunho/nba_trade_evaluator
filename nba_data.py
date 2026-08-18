@@ -1,4 +1,3 @@
-# nba_data.py
 import pandas as pd
 from nba_api.stats.static import players
 from nba_api.stats.endpoints import playercareerstats
@@ -48,8 +47,10 @@ def get_player_9cat_stats(player_id: int, season: str = CURRENT_SEASON) -> dict:
             return None
         
         season_df = df[df['SEASON_ID'] == season]
+        
+        # If the player did not play in the selected season, return None
         if season_df.empty:
-            season_df = df.iloc[[-1]]
+            return None
             
         row = season_df.iloc[0]
         gp = row['GP']

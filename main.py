@@ -1,4 +1,3 @@
-# main.py
 import flet as ft
 import traceback
 from nba_data import search_player_by_name, get_player_9cat_stats
@@ -7,13 +6,39 @@ from evaluator import evaluate_trade
 def main(page: ft.Page):
     page.title = "NBA 9-Cat Trade Evaluator"
     page.theme_mode = ft.ThemeMode.DARK
-    page.padding = 20
+    
+    # Safe padding for page edges on mobile
+    page.padding = ft.Padding.only(left=15, right=15, top=20, bottom=20)
     page.scroll = ft.ScrollMode.AUTO
 
     team_a_players = []
     team_b_players = []
 
-    header = ft.Text("🏀 NBA 9-Cats Trade Evaluator", size=28, weight=ft.FontWeight.BOLD)
+    # Title wrapped in a Container with top and bottom margin for clean spacing
+    header = ft.Container(
+        content=ft.Text("🏀 NBA fantasy 9-Cats Trade Evaluator", size=24, weight=ft.FontWeight.BOLD),
+        margin=ft.Margin.only(top=10, bottom=10)
+    )
+
+    # Season Dropdown Selection
+    season_dropdown = ft.Dropdown(
+        label="Select Season",
+        value="2026-27",
+        options=[
+            ft.dropdown.Option("2024-25"),
+            ft.dropdown.Option("2025-26"),
+            ft.dropdown.Option("2026-27"),
+        ],
+    )
+
+    # Top bar arranged vertically so dropdown sits cleanly on the next row
+    top_bar = ft.Container(
+        content=ft.Column([
+            header,
+            season_dropdown
+        ], spacing=10),
+        padding=ft.Padding.only(top=5, bottom=10)
+    )
 
     list_a = ft.Column(spacing=10)
     list_b = ft.Column(spacing=10)
@@ -76,7 +101,7 @@ def main(page: ft.Page):
 
     # Dynamic result display column
     result_column = ft.Column([
-        ft.Text("Add up to 10 players on each side to evaluate.", size=16)
+        ft.Text("Max 10 players on each side.", size=16)
     ])
 
     result_card = ft.Container(
@@ -130,7 +155,7 @@ def main(page: ft.Page):
             card = ft.Container(
                 content=ft.Row([
                     ft.Column([
-                        ft.Text(f"• {p['name']} ({p.get('season', '2025-26')})", weight=ft.FontWeight.BOLD),
+                        ft.Text(f"• {p['name']} ({p.get('season', season_dropdown.value)})", weight=ft.FontWeight.BOLD),
                         ft.Text(
                             f"PTS: {p.get('pts',0)} | REB: {p.get('reb',0)} | AST: {p.get('ast',0)} | "
                             f"STL: {p.get('stl',0)} | BLK: {p.get('blk',0)} | 3PM: {p.get('fg3m',0)} | "
@@ -164,7 +189,8 @@ def main(page: ft.Page):
         if not player_name:
             return
 
-        show_toast(f"Searching stats for '{player_name}'...")
+        selected_season = season_dropdown.value
+        show_toast(f"Searching stats for '{player_name}' ({selected_season})...")
 
         matches = search_player_by_name(player_name, max_results=10)
         if not matches:
@@ -172,10 +198,10 @@ def main(page: ft.Page):
             return
 
         player_info = matches[0]
-        stats = get_player_9cat_stats(player_info['id'], season="2025-26")
+        stats = get_player_9cat_stats(player_info['id'], season=selected_season)
 
         if not stats:
-            show_toast(f"No stats found for {player_info['full_name']}")
+            show_toast(f"No stats found for {player_info['full_name']} in {selected_season}")
             return
 
         player_data = {"name": player_info['full_name'], **stats}
@@ -186,7 +212,7 @@ def main(page: ft.Page):
         input_field.value = ""
 
         render_team_list(team)
-        show_toast(f"Added {player_info['full_name']}!")
+        show_toast(f"Added {player_info['full_name']} ({selected_season})!")
         page.update()
 
     def handle_eval(e):
@@ -197,8 +223,8 @@ def main(page: ft.Page):
         try:
             res = evaluate_trade(team_a_players, team_b_players)
 
-            names_a = ", ".join([p["name"] for p in team_a_players])
-            names_b = ", ".join([p["name"] for p in team_b_players])
+            names_a = ", ".join([f"{p['name']} ({p.get('season')})" for p in team_a_players])
+            names_b = ", ".join([f"{p['name']} ({p.get('season')})" for p in team_b_players])
 
             eval_controls = [
                 ft.Text("📊 Trade Comparison Summary", size=22, weight=ft.FontWeight.BOLD),
@@ -222,39 +248,45 @@ def main(page: ft.Page):
     input_a.on_submit = lambda e: add_player(e, "A")
     input_b.on_submit = lambda e: add_player(e, "B")
 
+    # Wrap application layout inside ft.SafeArea
     page.add(
-        header,
-        ft.Divider(),
-        ft.Row([
-            ft.Container(
-                content=ft.Column([
-                    ft.Text("Players Giving (Team A)", size=16, weight=ft.FontWeight.W_600),
-                    ft.Row([autocomplete_a, ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "A"))]),
-                    list_a
+        ft.SafeArea(
+            content=ft.Column([
+                top_bar,
+                ft.Divider(),
+                # ResponsiveRow stacks on phones (col=12) and sits side-by-side on desktop (col={"sm": 6})
+                ft.ResponsiveRow([
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Text("Players Giving (Team A)", size=16, weight=ft.FontWeight.W_600),
+                            ft.Row([autocomplete_a, ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "A"))]),
+                            list_a
+                        ]),
+                        col={"sm": 6}, padding=10, border=ft.Border.all(1, ft.Colors.OUTLINE)
+                    ),
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Text("Players Receiving (Team B)", size=16, weight=ft.FontWeight.W_600),
+                            ft.Row([autocomplete_b, ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "B"))]),
+                            list_b
+                        ]),
+                        col={"sm": 6}, padding=10, border=ft.Border.all(1, ft.Colors.OUTLINE)
+                    ),
                 ]),
-                expand=True, padding=10, border=ft.Border.all(1, ft.Colors.OUTLINE)
-            ),
-            ft.Container(
-                content=ft.Column([
-                    ft.Text("Players Receiving (Team B)", size=16, weight=ft.FontWeight.W_600),
-                    ft.Row([autocomplete_b, ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "B"))]),
-                    list_b
-                ]),
-                expand=True, padding=10, border=ft.Border.all(1, ft.Colors.OUTLINE)
-            ),
-        ]),
-        ft.Container(height=10),
-        ft.Row([
-            ft.Button(content=ft.Text("Evaluate 9-Cat Trade"), on_click=handle_eval),
-            ft.Button(
-                content=ft.Text("Clear All Players"),
-                icon=ft.Icons.CLEAR_ALL,
-                icon_color=ft.Colors.RED_400,
-                on_click=clear_all
-            ),
-        ], spacing=10),
-        ft.Container(height=10),
-        result_card
+                ft.Container(height=10),
+                ft.Row([
+                    ft.Button(content=ft.Text("Evaluate 9-Cat Trade"), on_click=handle_eval),
+                    ft.Button(
+                        content=ft.Text("Clear All Players"),
+                        icon=ft.Icons.CLEAR_ALL,
+                        icon_color=ft.Colors.RED_400,
+                        on_click=clear_all
+                    ),
+                ], spacing=10),
+                ft.Container(height=10),
+                result_card
+            ])
+        )
     )
 
 if __name__ == "__main__":
