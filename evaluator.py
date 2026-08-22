@@ -1,60 +1,76 @@
-# evaluator.py
+import flet as ft
 
-def calculate_9cat_value(stats: dict) -> float:
+STATS_BENCHMARK = {
+    "fg_pct": {"mean": 0.4781, "std": 0.06324369097},
+    "ft_pct": {"mean": 0.7842, "std": 0.0819088861},
+    "fg3m":   {"mean": 1.55,   "std": 0.88418079},
+    "reb":    {"mean": 4.82,   "std": 2.37764375},
+    "ast":    {"mean": 3.15,   "std": 1.99827541},
+    "stl":    {"mean": 0.88,   "std": 0.33680838},
+    "blk":    {"mean": 0.54,   "std": 0.44408994},
+    "tov":    {"mean": 1.53,   "std": 0.78074277},
+    "pts":    {"mean": 13.58,  "std": 5.97244752},
+}
+
+def calculate_player_zscore(player_stats):
+    """Calculates 9-cat Z-scores for a single player."""
+    z_scores = {}
+    for cat, bench in STATS_BENCHMARK.items():
+        val = player_stats.get(cat, 0)
+        if cat in ["fg_pct", "ft_pct"] and val > 1.0:
+            val = val / 100.0
+            
+        z = (val - bench["mean"]) / bench["std"]
+        if cat == "tov":
+            z = -z
+            
+        z_scores[cat] = round(z, 2)
+        
+    total_zscore = round(sum(z_scores.values()), 2)
+    return total_zscore, z_scores
+
+def evaluate_trade(team_a, team_b):
     """
-    Calculates total 9-cat value score for a single player.
-    Weights can be customized depending on league settings.
+    Evaluates trade fairness:
+    - Equal player counts: Fair if net diff <= 0.7
+    - Unequal player counts: Fair if net diff <= 0.5
     """
-    if not stats:
-        return 0.0
+    team_a_players = []
+    for p in team_a:
+        total, cats = calculate_player_zscore(p)
+        team_a_players.append({"name": p.get("name", "Unknown"), "total": total, "cats": cats})
 
-    # Custom weights for 9-Cat
-    pts_w = 1.0
-    reb_w = 1.2
-    ast_w = 1.5
-    stl_w = 3.0
-    blk_w = 3.0
-    fg3m_w = 2.0
-    fg_pct_w = 0.5   # Scaled for % (Baseline 45%)
-    ft_pct_w = 0.5   # Scaled for % (Baseline 75%)
-    tov_w = -2.0     # Negative impact
+    team_b_players = []
+    for p in team_b:
+        total, cats = calculate_player_zscore(p)
+        team_b_players.append({"name": p.get("name", "Unknown"), "total": total, "cats": cats})
 
-    score = (
-        stats.get('pts', 0) * pts_w +
-        stats.get('reb', 0) * reb_w +
-        stats.get('ast', 0) * ast_w +
-        stats.get('stl', 0) * stl_w +
-        stats.get('blk', 0) * blk_w +
-        stats.get('fg3m', 0) * fg3m_w +
-        (stats.get('fg_pct', 0) - 45.0) * fg_pct_w +
-        (stats.get('ft_pct', 0) - 75.0) * ft_pct_w +  # FT% compared vs 75% league average baseline
-        stats.get('tov', 0) * tov_w
-    )
-    return round(score, 1)
-
-
-def evaluate_trade(team_a_assets: list[dict], team_b_assets: list[dict]):
-    """Calculates total value scores for both sides and determines trade delta."""
+    team_a_score = sum(p["total"] for p in team_a_players)
+    team_b_score = sum(p["total"] for p in team_b_players)
     
-    score_a = sum(calculate_9cat_value(p) for p in team_a_assets[:10])
-    score_b = sum(calculate_9cat_value(p) for p in team_b_assets[:10])
-    
-    diff = round(score_b - score_a, 1)
-    
-    if abs(diff) <= 3.0:
-        status = "Fair / Even Trade"
-        color = "green"
-    elif diff > 3.0:
-        status = f"Team B with higher value: (+{diff} Value)"
-        color = "blue"
+    diff = round(team_b_score - team_a_score, 2)
+    abs_diff = abs(diff)
+
+    # Dynamic threshold: 0.5 for uneven trades, 0.7 for even trades
+    threshold = 0.5 if len(team_a) != len(team_b) else 0.7
+
+    if abs_diff <= threshold:
+        status = f"Fair Trade (Net Difference: {diff:+.2f})"
+        status_color = ft.Colors.GREEN_400
+    elif diff > threshold:
+        status = f"Unfair trade. Team B with (Net Value: +{diff:.2f})"
+        status_color = ft.Colors.RED_400
     else:
-        status = f"Team A with higher value: (+{abs(diff)} Value)"
-        color = "orange"
+        status = f"Unfair trade. Team A with (Net Value: +{abs_diff:.2f})"
+        status_color = ft.Colors.RED_400
 
     return {
-        "team_a_score": round(score_a, 1),
-        "team_b_score": round(score_b, 1),
-        "difference": diff,
         "status": status,
-        "status_color": color
+        "status_color": status_color,
+        "team_a_score": round(team_a_score, 2),
+        "team_b_score": round(team_b_score, 2),
+        "team_a_players": team_a_players,
+        "team_b_players": team_b_players,
+        "difference": diff,
+        "threshold_used": threshold
     }

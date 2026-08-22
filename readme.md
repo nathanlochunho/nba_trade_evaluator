@@ -35,4 +35,36 @@ Remove-Item -Recurse -Force "C:\Users\Natha\.gradle" -ErrorAction SilentlyContin
 .\venv\Scripts\Activate.ps1
 
 # Run the build
-flet build apk
+flet build apk --exclude venv -v
+
+
+
+# auto py to exe
+pip install auto-py-to-exe
+auto-py-to-exe
+
+#Script Location:
+
+Click Browse and select your main.py.
+
+Onefile vs One Directory:
+
+One Directory (--onedir): Recommended for testing — builds faster and opens quickly.
+
+Onefile (--onefile): Generates a single .exe file (takes a few extra seconds to open when clicked).
+
+Console Window:
+
+Select Console Based (useful to see any error messages or print statements while running).
+
+Additional Files (Crucial Step):
+
+Scroll down and expand the Additional Files section.
+
+Click Add Files and select evaluator.py and nba_data.py.
+
+(This ensures PyInstaller packages your custom modules alongside main.py).
+
+Convert:
+
+Click the big CONVERT .PY TO .EXE button at the bottom.

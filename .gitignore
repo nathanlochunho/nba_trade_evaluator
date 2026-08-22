@@ -12,3 +12,5 @@ build/
 
 # Windows temp files
 *.tmp
+
+*.exe

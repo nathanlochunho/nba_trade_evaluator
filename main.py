@@ -16,7 +16,7 @@ def main(page: ft.Page):
 
     # Title wrapped in a Container with top and bottom margin for clean spacing
     header = ft.Container(
-        content=ft.Text("🏀 NBA fantasy 9-Cats Trade Evaluator", size=24, weight=ft.FontWeight.BOLD),
+        content=ft.Text("🏀 NBA 9-Cats Trade Evaluator", size=24, weight=ft.FontWeight.BOLD),
         margin=ft.Margin.only(top=10, bottom=10)
     )
 
@@ -101,7 +101,7 @@ def main(page: ft.Page):
 
     # Dynamic result display column
     result_column = ft.Column([
-        ft.Text("Max 10 players on each side.", size=16)
+        ft.Text("Add up to 10 players on each side to evaluate.", size=16)
     ])
 
     result_card = ft.Container(
@@ -204,7 +204,7 @@ def main(page: ft.Page):
             show_toast(f"No stats found for {player_info['full_name']} in {selected_season}")
             return
 
-        player_data = {"name": player_info['full_name'], **stats}
+        player_data = {"name": player_info['full_name'], "season": selected_season, **stats}
         target_list.append(player_data)
 
         autocomplete.value = ""
@@ -223,18 +223,24 @@ def main(page: ft.Page):
         try:
             res = evaluate_trade(team_a_players, team_b_players)
 
-            names_a = ", ".join([f"{p['name']} ({p.get('season')})" for p in team_a_players])
-            names_b = ", ".join([f"{p['name']} ({p.get('season')})" for p in team_b_players])
+            # Format player strings to include individual Z-Scores: "Player Name (+Z.Score)"
+            team_a_str = ", ".join([f"{p['name']} ({p['total']:+.2f})" for p in res.get("team_a_players", [])])
+            team_b_str = ", ".join([f"{p['name']} ({p['total']:+.2f})" for p in res.get("team_b_players", [])])
 
             eval_controls = [
-                ft.Text("📊 Trade Comparison Summary", size=22, weight=ft.FontWeight.BOLD),
-                ft.Text(f"Team A gives ({len(team_a_players)} player(s)): {names_a}", size=14, weight=ft.FontWeight.W_500),
-                ft.Text(f"Team B gives ({len(team_b_players)} player(s)): {names_b}", size=14, weight=ft.FontWeight.W_500),
+                ft.Text("📊 Trade Comparison Summary (9-Cat Z-Scores)", size=20, weight=ft.FontWeight.BOLD),
+                ft.Text(f"Team A Gives ({len(team_a_players)} player(s)): {team_a_str}", size=14, weight=ft.FontWeight.W_500),
+                ft.Text(f"Team B Gives ({len(team_b_players)} player(s)): {team_b_str}", size=14, weight=ft.FontWeight.W_500),
                 ft.Divider(),
-                ft.Text(f"Verdict: {res.get('status', 'Evaluated')}", size=18, weight=ft.FontWeight.BOLD, color=res.get('status_color', ft.Colors.WHITE)),
-                ft.Text(f"Team A Total Value Score: {res.get('team_a_score', 0)}"),
-                ft.Text(f"Team B Total Value Score: {res.get('team_b_score', 0)}"),
-                ft.Text(f"Net Difference: {res.get('difference', 0)}"),
+                ft.Text(
+                    f"Verdict: {res.get('status', 'Evaluated')}", 
+                    size=18, 
+                    weight=ft.FontWeight.BOLD, 
+                    color=res.get('status_color', ft.Colors.WHITE)
+                ),
+                ft.Text(f"Team A Total Z-Score: {res.get('team_a_score', 0):+.2f}"),
+                ft.Text(f"Team B Total Z-Score: {res.get('team_b_score', 0):+.2f}"),
+                ft.Text(f"Net Z-Score Difference: {res.get('difference', 0):+.2f}"),
             ]
 
             result_column.controls = eval_controls

@@ -1,0 +1,6 @@
+output/
+build/
+dist/
+venv/
+.venv/
+*.exe
