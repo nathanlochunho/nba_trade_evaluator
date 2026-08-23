@@ -68,3 +68,10 @@ Click Add Files and select evaluator.py and nba_data.py.
 Convert:
 
 Click the big CONVERT .PY TO .EXE button at the bottom.
+
+# MacOs build
+cd ~/Developer/nba_trade_evaluator
+
+source venv/bin/activate
+
+rm -rf build dist && python setup.py py2app && codesign --force --deep --sign - dist/main.app && open dist/main.app
