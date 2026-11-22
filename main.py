@@ -301,12 +301,11 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    # ft.run(main)
-    port = int(os.environ.get("PORT", 8550))
-    os.environ.setdefault("FLET_SERVER_PORT", str(port))
-    ft.run(
-        main,
-        host="0.0.0.0",
-        port=port,
-        view=ft.AppView.WEB_BROWSER,
-    )
+    port = int(os.environ.get("PORT", 10000))
+    os.environ["FLET_SERVER_PORT"] = str(port)
+    os.environ["FLET_SERVER_IP"] = "0.0.0.0"
+    os.environ["FLET_FORCE_WEB_SERVER"] = "true"
+    if os.name == "nt":
+        ft.run(main, port=port, host="0.0.0.0", view=ft.AppView.WEB_BROWSER)
+    else:
+        ft.run(main, port=port, host="0.0.0.0")
