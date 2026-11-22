@@ -51,8 +51,8 @@ def evaluate_trade(team_a, team_b):
     diff = round(team_b_score - team_a_score, 2)
     abs_diff = abs(diff)
 
-    # Dynamic threshold: 0.5 for uneven trades, 0.7 for even trades
-    threshold = 0.5 if len(team_a) != len(team_b) else 0.7
+    # Dynamic threshold: 1.25 for uneven trades, 1.75 for even trades
+    threshold = 1.25 if len(team_a) != len(team_b) else 1.75
 
     if abs_diff <= threshold:
         status = f"Fair Trade (Net Difference: {diff:+.2f})"

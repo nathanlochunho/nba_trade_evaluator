@@ -2,6 +2,7 @@ import flet as ft
 import traceback
 from nba_data import search_player_by_name, get_player_9cat_stats
 from evaluator import evaluate_trade
+import os
 
 def main(page: ft.Page):
     page.title = "NBA 9-Cat Trade Evaluator"
@@ -296,4 +297,11 @@ def main(page: ft.Page):
     )
 
 if __name__ == "__main__":
-    ft.run(main)
+    # ft.run(main)
+    port = int(os.environ.get("PORT", 8550))
+    ft.app(
+        target=main,
+        view=ft.AppView.WEB_BROWSER,
+        host="0.0.0.0",
+        port=port
+    )
