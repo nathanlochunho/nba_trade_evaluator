@@ -1,13 +1,14 @@
-import flet as ft
+import os
 import traceback
+import flet as ft
 from nba_data import search_player_by_name, get_player_9cat_stats
 from evaluator import evaluate_trade
-import os
+
 
 def main(page: ft.Page):
     page.title = "NBA 9-Cat Trade Evaluator"
     page.theme_mode = ft.ThemeMode.DARK
-    
+
     # Safe padding for page edges on mobile
     page.padding = ft.Padding.only(left=15, right=15, top=20, bottom=20)
     page.scroll = ft.ScrollMode.AUTO
@@ -18,7 +19,7 @@ def main(page: ft.Page):
     # Title wrapped in a Container with top and bottom margin for clean spacing
     header = ft.Container(
         content=ft.Text("🏀 NBA 9-Cats Trade Evaluator", size=24, weight=ft.FontWeight.BOLD),
-        margin=ft.Margin.only(top=10, bottom=10)
+        margin=ft.Margin.only(top=10, bottom=10),
     )
 
     # Season Dropdown Selection
@@ -36,13 +37,24 @@ def main(page: ft.Page):
     top_bar = ft.Container(
         content=ft.Column([
             header,
-            season_dropdown
+            season_dropdown,
         ], spacing=10),
-        padding=ft.Padding.only(top=5, bottom=10)
+        padding=ft.Padding.only(top=5, bottom=10),
     )
 
     list_a = ft.Column(spacing=10)
     list_b = ft.Column(spacing=10)
+
+    def build_suggestions(query: str):
+        matches = search_player_by_name(
+            query,
+            max_results=10,
+            season=season_dropdown.value or "2026-27",
+        )
+        return [
+            ft.AutoCompleteSuggestion(key=m["full_name"], value=m["full_name"])
+            for m in (matches[:10] if matches else [])
+        ]
 
     # Search and suggestion handlers - displays up to 10 matches
     def handle_search_a(e):
@@ -51,12 +63,7 @@ def main(page: ft.Page):
             autocomplete_a.suggestions = []
             autocomplete_a.update()
             return
-        matches = search_player_by_name(query, max_results=10)
-        suggestions = [
-            ft.AutoCompleteSuggestion(key=m['full_name'], value=m['full_name'])
-            for m in (matches[:10] if matches else [])
-        ]
-        autocomplete_a.suggestions = suggestions
+        autocomplete_a.suggestions = build_suggestions(query)
         autocomplete_a.update()
 
     def handle_search_b(e):
@@ -65,12 +72,7 @@ def main(page: ft.Page):
             autocomplete_b.suggestions = []
             autocomplete_b.update()
             return
-        matches = search_player_by_name(query, max_results=10)
-        suggestions = [
-            ft.AutoCompleteSuggestion(key=m['full_name'], value=m['full_name'])
-            for m in (matches[:10] if matches else [])
-        ]
-        autocomplete_b.suggestions = suggestions
+        autocomplete_b.suggestions = build_suggestions(query)
         autocomplete_b.update()
 
     def on_select_a(e: ft.AutoCompleteSelectEvent):
@@ -88,7 +90,7 @@ def main(page: ft.Page):
         on_change=handle_search_a,
         on_select=on_select_a,
         suggestions=[],
-        expand=True
+        expand=True,
     )
     autocomplete_a.content = input_a
 
@@ -96,7 +98,7 @@ def main(page: ft.Page):
         on_change=handle_search_b,
         on_select=on_select_b,
         suggestions=[],
-        expand=True
+        expand=True,
     )
     autocomplete_b.content = input_b
 
@@ -109,7 +111,7 @@ def main(page: ft.Page):
         content=result_column,
         padding=15,
         border_radius=8,
-        bgcolor=ft.Colors.GREY_900
+        bgcolor=ft.Colors.GREY_900,
     )
 
     def show_toast(msg: str):
@@ -130,7 +132,7 @@ def main(page: ft.Page):
         team_b_players.clear()
         render_team_list("A")
         render_team_list("B")
-        
+
         # Reset input fields and autocomplete suggestions
         input_a.value = ""
         input_b.value = ""
@@ -161,19 +163,19 @@ def main(page: ft.Page):
                             f"PTS: {p.get('pts',0)} | REB: {p.get('reb',0)} | AST: {p.get('ast',0)} | "
                             f"STL: {p.get('stl',0)} | BLK: {p.get('blk',0)} | 3PM: {p.get('fg3m',0)} | "
                             f"FG%: {p.get('fg_pct',0)} | FT%: {p.get('ft_pct',0)} | TO: {p.get('tov',0)}",
-                            size=12
-                        )
+                            size=12,
+                        ),
                     ], expand=True),
                     ft.IconButton(
                         icon=ft.Icons.DELETE_OUTLINED,
                         icon_color=ft.Colors.RED_400,
                         tooltip="Remove Player",
-                        on_click=lambda e, player=p, t=team: remove_player(player, t)
-                    )
+                        on_click=lambda e, player=p, t=team: remove_player(player, t),
+                    ),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 padding=8,
                 border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-                border_radius=5
+                border_radius=5,
             )
             target_view.controls.append(card)
 
@@ -190,22 +192,22 @@ def main(page: ft.Page):
         if not player_name:
             return
 
-        selected_season = season_dropdown.value
+        selected_season = season_dropdown.value or "2026-27"
         show_toast(f"Searching stats for '{player_name}' ({selected_season})...")
 
-        matches = search_player_by_name(player_name, max_results=10)
+        matches = search_player_by_name(player_name, max_results=10, season=selected_season)
         if not matches:
             show_toast(f"Active player '{player_name}' not found.")
             return
 
         player_info = matches[0]
-        stats = get_player_9cat_stats(player_info['id'], season=selected_season)
+        stats = get_player_9cat_stats(player_info["id"], season=selected_season)
 
         if not stats:
             show_toast(f"No stats found for {player_info['full_name']} in {selected_season}")
             return
 
-        player_data = {"name": player_info['full_name'], "season": selected_season, **stats}
+        player_data = {"name": player_info["full_name"], "season": selected_season, **stats}
         target_list.append(player_data)
 
         autocomplete.value = ""
@@ -224,7 +226,6 @@ def main(page: ft.Page):
         try:
             res = evaluate_trade(team_a_players, team_b_players)
 
-            # Format player strings to include individual Z-Scores: "Player Name (+Z.Score)"
             team_a_str = ", ".join([f"{p['name']} ({p['total']:+.2f})" for p in res.get("team_a_players", [])])
             team_b_str = ", ".join([f"{p['name']} ({p['total']:+.2f})" for p in res.get("team_b_players", [])])
 
@@ -234,10 +235,10 @@ def main(page: ft.Page):
                 ft.Text(f"Team B Gives ({len(team_b_players)} player(s)): {team_b_str}", size=14, weight=ft.FontWeight.W_500),
                 ft.Divider(),
                 ft.Text(
-                    f"Verdict: {res.get('status', 'Evaluated')}", 
-                    size=18, 
-                    weight=ft.FontWeight.BOLD, 
-                    color=res.get('status_color', ft.Colors.WHITE)
+                    f"Verdict: {res.get('status', 'Evaluated')}",
+                    size=18,
+                    weight=ft.FontWeight.BOLD,
+                    color=res.get("status_color", ft.Colors.WHITE),
                 ),
                 ft.Text(f"Team A Total Z-Score: {res.get('team_a_score', 0):+.2f}"),
                 ft.Text(f"Team B Total Z-Score: {res.get('team_b_score', 0):+.2f}"),
@@ -255,29 +256,31 @@ def main(page: ft.Page):
     input_a.on_submit = lambda e: add_player(e, "A")
     input_b.on_submit = lambda e: add_player(e, "B")
 
-    # Wrap application layout inside ft.SafeArea
     page.add(
         ft.SafeArea(
             content=ft.Column([
                 top_bar,
                 ft.Divider(),
-                # ResponsiveRow stacks on phones (col=12) and sits side-by-side on desktop (col={"sm": 6})
                 ft.ResponsiveRow([
                     ft.Container(
                         content=ft.Column([
                             ft.Text("Players Giving (Team A)", size=16, weight=ft.FontWeight.W_600),
                             ft.Row([autocomplete_a, ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "A"))]),
-                            list_a
+                            list_a,
                         ]),
-                        col={"sm": 6}, padding=10, border=ft.Border.all(1, ft.Colors.OUTLINE)
+                        col={"sm": 6},
+                        padding=10,
+                        border=ft.Border.all(1, ft.Colors.OUTLINE),
                     ),
                     ft.Container(
                         content=ft.Column([
                             ft.Text("Players Receiving (Team B)", size=16, weight=ft.FontWeight.W_600),
                             ft.Row([autocomplete_b, ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "B"))]),
-                            list_b
+                            list_b,
                         ]),
-                        col={"sm": 6}, padding=10, border=ft.Border.all(1, ft.Colors.OUTLINE)
+                        col={"sm": 6},
+                        padding=10,
+                        border=ft.Border.all(1, ft.Colors.OUTLINE),
                     ),
                 ]),
                 ft.Container(height=10),
@@ -287,21 +290,23 @@ def main(page: ft.Page):
                         content=ft.Text("Clear All Players"),
                         icon=ft.Icons.CLEAR_ALL,
                         icon_color=ft.Colors.RED_400,
-                        on_click=clear_all
+                        on_click=clear_all,
                     ),
                 ], spacing=10),
                 ft.Container(height=10),
-                result_card
+                result_card,
             ])
         )
     )
 
+
 if __name__ == "__main__":
     # ft.run(main)
     port = int(os.environ.get("PORT", 8550))
-    ft.app(
-        target=main,
-        view=ft.AppView.WEB_BROWSER,
+    os.environ.setdefault("FLET_SERVER_PORT", str(port))
+    ft.run(
+        main,
         host="0.0.0.0",
-        port=port
+        port=port,
+        view=ft.AppView.WEB_BROWSER,
     )
