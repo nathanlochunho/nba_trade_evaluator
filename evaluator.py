@@ -1,4 +1,12 @@
 import flet as ft
+import logging
+
+logger = logging.getLogger("trade_evaluator")
+if not logger.handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+    )
 
 STATS_BENCHMARK = {
     "fg_pct": {"mean": 0.4781, "std": 0.06324369097},
@@ -65,6 +73,25 @@ def evaluate_trade(team_a, team_b):
     else:
         status = f"Unfair trade. Team A with (Net Value: +{abs_diff:.2f})"
         status_color = ft.Colors.RED_400
+
+    team_a_summary = [
+        f"{p.get('name', 'Unknown')} ({p.get('season', 'N/A')} | Z: {res_p['total']:+.2f})"
+        for p, res_p in zip(team_a, team_a_players)
+    ]
+    team_b_summary = [
+        f"{p.get('name', 'Unknown')} ({p.get('season', 'N/A')} | Z: {res_p['total']:+.2f})"
+        for p, res_p in zip(team_b, team_b_players)
+    ]
+
+    logger.info(
+        "EVALUATION | Team A: [%s] (Total: %+.2f) vs. Team B: [%s] (Total: %+.2f) | Delta (B - A): %+.2f | %s",
+        ", ".join(team_a_summary),
+        team_a_score,
+        ", ".join(team_b_summary),
+        team_b_score,
+        diff,
+        status,
+    )
 
     return {
         "status": status,
