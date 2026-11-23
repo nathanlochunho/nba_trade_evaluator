@@ -1,12 +1,15 @@
 import flet as ft
 import logging
+import sys
 
 logger = logging.getLogger("trade_evaluator")
+logger.setLevel(logging.INFO)
+logger.propagate = False
+
 if not logger.handlers:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-    )
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+    logger.addHandler(handler)
 
 STATS_BENCHMARK = {
     "fg_pct": {"mean": 0.4781, "std": 0.06324369097},
@@ -92,7 +95,9 @@ def evaluate_trade(team_a, team_b):
         diff,
         status,
     )
-
+    
+    sys.stdout.flush()
+    
     return {
         "status": status,
         "status_color": status_color,
