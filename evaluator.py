@@ -12,28 +12,31 @@ STATS_BENCHMARK = {
     "pts":    {"mean": 13.58,  "std": 5.97244752},
 }
 
+
 def calculate_player_zscore(player_stats):
     """Calculates 9-cat Z-scores for a single player."""
     z_scores = {}
     for cat, bench in STATS_BENCHMARK.items():
-        val = player_stats.get(cat, 0)
+        raw_val = player_stats.get(cat, 0)
+        val = 0.0 if raw_val is None else float(raw_val)
         if cat in ["fg_pct", "ft_pct"] and val > 1.0:
             val = val / 100.0
-            
+
         z = (val - bench["mean"]) / bench["std"]
         if cat == "tov":
             z = -z
-            
+
         z_scores[cat] = round(z, 2)
-        
+
     total_zscore = round(sum(z_scores.values()), 2)
     return total_zscore, z_scores
+
 
 def evaluate_trade(team_a, team_b):
     """
     Evaluates trade fairness:
-    - Equal player counts: Fair if net diff <= 0.7
-    - Unequal player counts: Fair if net diff <= 0.5
+    - Equal player counts: fair threshold 1.75
+    - Unequal player counts: fair threshold 1.25
     """
     team_a_players = []
     for p in team_a:
@@ -47,11 +50,10 @@ def evaluate_trade(team_a, team_b):
 
     team_a_score = sum(p["total"] for p in team_a_players)
     team_b_score = sum(p["total"] for p in team_b_players)
-    
+
     diff = round(team_b_score - team_a_score, 2)
     abs_diff = abs(diff)
 
-    # Dynamic threshold: 1.25 for uneven trades, 1.75 for even trades
     threshold = 1.25 if len(team_a) != len(team_b) else 1.75
 
     if abs_diff <= threshold:
@@ -72,5 +74,5 @@ def evaluate_trade(team_a, team_b):
         "team_a_players": team_a_players,
         "team_b_players": team_b_players,
         "difference": diff,
-        "threshold_used": threshold
+        "threshold_used": threshold,
     }

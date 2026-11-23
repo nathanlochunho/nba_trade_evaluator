@@ -1,7 +1,7 @@
 import os
 import traceback
 import flet as ft
-from nba_data import search_player_by_name, get_player_9cat_stats
+from nba_data import search_player_by_name, get_player_9cat_stats, season_to_espn_year
 from evaluator import evaluate_trade
 
 
@@ -16,13 +16,11 @@ def main(page: ft.Page):
     team_a_players = []
     team_b_players = []
 
-    # Title wrapped in a Container with top and bottom margin for clean spacing
     header = ft.Container(
         content=ft.Text("🏀 NBA 9-Cats Trade Evaluator", size=24, weight=ft.FontWeight.BOLD),
         margin=ft.Margin.only(top=10, bottom=10),
     )
 
-    # Season Dropdown Selection
     season_dropdown = ft.Dropdown(
         label="Select Season",
         value="2026-27",
@@ -33,7 +31,6 @@ def main(page: ft.Page):
         ],
     )
 
-    # Top bar arranged vertically so dropdown sits cleanly on the next row
     top_bar = ft.Container(
         content=ft.Column([
             header,
@@ -44,6 +41,10 @@ def main(page: ft.Page):
 
     list_a = ft.Column(spacing=10)
     list_b = ft.Column(spacing=10)
+    
+    def show_toast(msg: str):
+        print(f"[UI TOAST] {msg}")
+        page.open(ft.SnackBar(ft.Text(str(msg))))
 
     def build_suggestions(query: str):
         matches = search_player_by_name(
@@ -56,7 +57,6 @@ def main(page: ft.Page):
             for m in (matches[:10] if matches else [])
         ]
 
-    # Search and suggestion handlers - displays up to 10 matches
     def handle_search_a(e):
         query = (e.data or "").strip()
         if len(query) < 2:
@@ -102,7 +102,6 @@ def main(page: ft.Page):
     )
     autocomplete_b.content = input_b
 
-    # Dynamic result display column
     result_column = ft.Column([
         ft.Text("Add up to 10 players on each side to evaluate.", size=16)
     ])
@@ -126,14 +125,12 @@ def main(page: ft.Page):
         render_team_list(team)
         page.update()
 
-    # Clear all players from both teams
     def clear_all(e):
         team_a_players.clear()
         team_b_players.clear()
         render_team_list("A")
         render_team_list("B")
 
-        # Reset input fields and autocomplete suggestions
         input_a.value = ""
         input_b.value = ""
         autocomplete_a.suggestions = []
@@ -141,7 +138,6 @@ def main(page: ft.Page):
         autocomplete_a.update()
         autocomplete_b.update()
 
-        # Reset result column text
         result_column.controls = [
             ft.Text("Add up to 10 players on each side to evaluate.", size=16)
         ]
@@ -158,7 +154,10 @@ def main(page: ft.Page):
             card = ft.Container(
                 content=ft.Row([
                     ft.Column([
-                        ft.Text(f"• {p['name']} ({p.get('season', season_dropdown.value)})", weight=ft.FontWeight.BOLD),
+                        ft.Text(
+                            f"• {p['name']} ({p.get('season', season_dropdown.value)})",
+                            weight=ft.FontWeight.BOLD,
+                        ),
                         ft.Text(
                             f"PTS: {p.get('pts',0)} | REB: {p.get('reb',0)} | AST: {p.get('ast',0)} | "
                             f"STL: {p.get('stl',0)} | BLK: {p.get('blk',0)} | 3PM: {p.get('fg3m',0)} | "
@@ -193,11 +192,12 @@ def main(page: ft.Page):
             return
 
         selected_season = season_dropdown.value or "2026-27"
-        show_toast(f"Searching stats for '{player_name}' ({selected_season})...")
+        espn_yr = season_to_espn_year(selected_season)
+        show_toast(f"Searching stats for '{player_name}' ({selected_season} / ESPN {espn_yr})...")
 
         matches = search_player_by_name(player_name, max_results=10, season=selected_season)
         if not matches:
-            show_toast(f"Active player '{player_name}' not found.")
+            show_toast(f"Player '{player_name}' not found on ESPN roster.")
             return
 
         player_info = matches[0]
@@ -226,13 +226,25 @@ def main(page: ft.Page):
         try:
             res = evaluate_trade(team_a_players, team_b_players)
 
-            team_a_str = ", ".join([f"{p['name']} ({p['total']:+.2f})" for p in res.get("team_a_players", [])])
-            team_b_str = ", ".join([f"{p['name']} ({p['total']:+.2f})" for p in res.get("team_b_players", [])])
+            team_a_str = ", ".join(
+                [f"{p['name']} ({p['total']:+.2f})" for p in res.get("team_a_players", [])]
+            )
+            team_b_str = ", ".join(
+                [f"{p['name']} ({p['total']:+.2f})" for p in res.get("team_b_players", [])]
+            )
 
             eval_controls = [
                 ft.Text("📊 Trade Comparison Summary (9-Cat Z-Scores)", size=20, weight=ft.FontWeight.BOLD),
-                ft.Text(f"Team A Gives ({len(team_a_players)} player(s)): {team_a_str}", size=14, weight=ft.FontWeight.W_500),
-                ft.Text(f"Team B Gives ({len(team_b_players)} player(s)): {team_b_str}", size=14, weight=ft.FontWeight.W_500),
+                ft.Text(
+                    f"Team A Gives ({len(team_a_players)} player(s)): {team_a_str}",
+                    size=14,
+                    weight=ft.FontWeight.W_500,
+                ),
+                ft.Text(
+                    f"Team B Gives ({len(team_b_players)} player(s)): {team_b_str}",
+                    size=14,
+                    weight=ft.FontWeight.W_500,
+                ),
                 ft.Divider(),
                 ft.Text(
                     f"Verdict: {res.get('status', 'Evaluated')}",
@@ -265,7 +277,10 @@ def main(page: ft.Page):
                     ft.Container(
                         content=ft.Column([
                             ft.Text("Players Giving (Team A)", size=16, weight=ft.FontWeight.W_600),
-                            ft.Row([autocomplete_a, ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "A"))]),
+                            ft.Row([
+                                autocomplete_a,
+                                ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "A")),
+                            ]),
                             list_a,
                         ]),
                         col={"sm": 6},
@@ -275,7 +290,10 @@ def main(page: ft.Page):
                     ft.Container(
                         content=ft.Column([
                             ft.Text("Players Receiving (Team B)", size=16, weight=ft.FontWeight.W_600),
-                            ft.Row([autocomplete_b, ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "B"))]),
+                            ft.Row([
+                                autocomplete_b,
+                                ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "B")),
+                            ]),
                             list_b,
                         ]),
                         col={"sm": 6},
@@ -301,11 +319,15 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    os.environ["FLET_SERVER_PORT"] = str(port)
-    os.environ["FLET_SERVER_IP"] = "0.0.0.0"
-    os.environ["FLET_FORCE_WEB_SERVER"] = "true"
-    if os.name == "nt":
-        ft.run(main, port=port, host="0.0.0.0", view=ft.AppView.WEB_BROWSER)
+    is_mobile_packaging = os.environ.get("SERIOUS_PYTHON_SITE_PACKAGES") is not None
+    if is_mobile_packaging:
+        ft.app(main)
     else:
-        ft.run(main, port=port, host="0.0.0.0")
+        port = int(os.environ.get("PORT", 10000))
+        os.environ["FLET_SERVER_PORT"] = str(port)
+        os.environ["FLET_SERVER_IP"] = "0.0.0.0"
+        os.environ["FLET_FORCE_WEB_SERVER"] = "true"
+        if os.name == "nt":
+            ft.run(main, port=port, host="0.0.0.0", view=ft.AppView.WEB_BROWSER)
+        else:
+            ft.run(main, port=port, host="0.0.0.0")
