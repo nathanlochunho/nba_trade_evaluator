@@ -264,7 +264,7 @@ def get_player_9cat_stats(
 ) -> dict[str, Any] | None:
     ath_id = str(player_id).strip()
     if not ath_id:
-        print("[DEBUG] Empty player_id passed to get_player_9cat_stats")
+        #print("[DEBUG] Empty player_id passed to get_player_9cat_stats")
         return None
 
     espn_year = season_to_espn_year(season)
@@ -274,26 +274,26 @@ def get_player_9cat_stats(
 
     try:
         url = GAMELOG_URL.format(athlete_id=ath_id)
-        print(f"\n[DEBUG] GET {url}?season={espn_year}")
+        #print(f"\n[DEBUG] GET {url}?season={espn_year}")
         resp = requests.get(
             url,
             params={"season": espn_year},
             headers=HEADERS,
             timeout=timeout,
         )
-        print(f"[DEBUG] HTTP Status: {resp.status_code}")
+        # print(f"[DEBUG] HTTP Status: {resp.status_code}")
         resp.raise_for_status()
         payload = resp.json()
-        print(f"[DEBUG] Top-level JSON keys: {list(payload.keys())}")
-        print(f"[DEBUG] Top-level labels: {payload.get('labels')}")
+        #print(f"[DEBUG] Top-level JSON keys: {list(payload.keys())}")
+        # print(f"[DEBUG] Top-level labels: {payload.get('labels')}")
 
         raw_rows: list[tuple[list[str], list[Any]]] = []
         season_types = payload.get("seasonTypes")
         if isinstance(season_types, list) and season_types:
-            print(f"[DEBUG] seasonTypes count: {len(season_types)}")
+            # print(f"[DEBUG] seasonTypes count: {len(season_types)}")
             for idx, st in enumerate(season_types):
                 st_name = str(st.get("displayName") or st.get("name") or "")
-                print(f"[DEBUG]   seasonType[{idx}] name='{st_name}', keys={list(st.keys())}")
+                # print(f"[DEBUG]   seasonType[{idx}] name='{st_name}', keys={list(st.keys())}")
                 if "preseason" in st_name.lower() or "postseason" in st_name.lower():
                     continue
                 _collect_game_stat_rows(st, payload.get("labels"), raw_rows)
@@ -302,14 +302,14 @@ def get_player_9cat_stats(
         else:
             _collect_game_stat_rows(payload, payload.get("labels"), raw_rows)
 
-        print(f"[DEBUG] Collected raw_rows count: {len(raw_rows)}")
-        if raw_rows:
-            print(f"[DEBUG] Sample row[0] labels: {raw_rows[0][0]}")
-            print(f"[DEBUG] Sample row[0] values: {raw_rows[0][1]}")
-        else:
-            # Print a compact preview of payload so we can see the exact structure
-            import json
-            print(f"[DEBUG] Payload preview: {json.dumps(payload)[:1200]}")
+        # print(f"[DEBUG] Collected raw_rows count: {len(raw_rows)}")
+        # if raw_rows:
+        #     print(f"[DEBUG] Sample row[0] labels: {raw_rows[0][0]}")
+        #     print(f"[DEBUG] Sample row[0] values: {raw_rows[0][1]}")
+        # else:
+        #     # Print a compact preview of payload so we can see the exact structure
+        #     import json
+        #     print(f"[DEBUG] Payload preview: {json.dumps(payload)[:1200]}")
 
         games_counted = 0
         tot_pts = tot_reb = tot_ast = tot_stl = tot_blk = tot_3pm = tot_tov = 0.0
@@ -377,7 +377,7 @@ def get_player_9cat_stats(
                 if ft_pct_val is not None:
                     ft_pct_samples.append(ft_pct_val * 100.0 if ft_pct_val <= 1.0 else ft_pct_val)
 
-        print(f"[DEBUG] games_counted: {games_counted}")
+        # print(f"[DEBUG] games_counted: {games_counted}")
         if games_counted <= 0:
             _STATS_CACHE[cache_key] = None
             return None
@@ -408,12 +408,12 @@ def get_player_9cat_stats(
             "ft_pct": round(ft_pct, 1),
             "tov": round(tot_tov / games_counted, 1),
         }
-        print(f"[DEBUG] Parsed 9-cat result: {result}")
+        # print(f"[DEBUG] Parsed 9-cat result: {result}")
         _STATS_CACHE[cache_key] = result
         return result
 
     except Exception as e:
         import traceback
-        print(f"[DEBUG] Exception for player {ath_id}: {e}")
+        # print(f"[DEBUG] Exception for player {ath_id}: {e}")
         traceback.print_exc()
         return None
