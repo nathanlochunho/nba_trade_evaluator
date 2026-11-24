@@ -177,7 +177,7 @@ def search_player_by_name(
     results: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
 
-    # 1. Direct ESPN player search API (finds all NBA players including Keegan Murray & Brandon Ingram)
+    # 1. Direct ESPN player search API
     try:
         resp = requests.get(
             SEARCH_URL,
@@ -279,4 +279,150 @@ def _collect_game_stat_rows(
 
 
 def _row_to_stat_dict(labels: list[str], values: list[Any]) -> dict[str, Any]:
-    mapping: dict[str
+    mapping: dict[str, Any] = {}
+    for idx, lbl in enumerate(labels):
+        if idx < len(values):
+            mapping[lbl.upper()] = values[idx]
+    return mapping
+
+
+def get_player_9cat_stats(
+    player_id: str | int,
+    season: str = CURRENT_SEASON,
+    timeout: float = 15.0,
+) -> dict[str, Any] | None:
+    """Fetches a player's game log for `season` and aggregates 9-category per-game averages."""
+    ath_id = str(player_id).strip()
+    if not ath_id:
+        return None
+
+    espn_year = season_to_espn_year(season)
+    cache_key = (ath_id, espn_year)
+    if cache_key in _STATS_CACHE:
+        return _STATS_CACHE[cache_key]
+
+    try:
+        url = GAMELOG_URL.format(athlete_id=ath_id)
+        resp = requests.get(
+            url,
+            params={"season": espn_year},
+            headers=HEADERS,
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+
+        raw_rows: list[tuple[list[str], list[Any]]] = []
+        season_types = payload.get("seasonTypes")
+        if isinstance(season_types, list) and season_types:
+            for st in season_types:
+                st_name = str(st.get("displayName") or st.get("name") or "").lower()
+                if "preseason" in st_name or "postseason" in st_name:
+                    continue
+                _collect_game_stat_rows(st, payload.get("labels"), raw_rows)
+            if not raw_rows:
+                _collect_game_stat_rows(season_types, payload.get("labels"), raw_rows)
+        else:
+            _collect_game_stat_rows(payload, payload.get("labels"), raw_rows)
+
+        games_counted = 0
+        tot_pts = tot_reb = tot_ast = tot_stl = tot_blk = tot_3pm = tot_tov = 0.0
+        tot_fgm = tot_fga = tot_ftm = tot_fta = 0.0
+        fg_pct_samples: list[float] = []
+        ft_pct_samples: list[float] = []
+
+        for labels, vals in raw_rows:
+            row = _row_to_stat_dict(labels, vals)
+
+            if "MIN" in row:
+                min_raw = str(row.get("MIN") or "").strip().upper()
+                if min_raw in ("DNP", "N/A", "--", ""):
+                    continue
+
+            pts = _parse_float(row.get("PTS"))
+            reb = _parse_float(row.get("REB") or row.get("TRB"))
+            ast = _parse_float(row.get("AST"))
+            stl = _parse_float(row.get("STL"))
+            blk = _parse_float(row.get("BLK"))
+            tov = _parse_float(row.get("TO") or row.get("TOV"))
+
+            tpm = _parse_float(row.get("3PM") or row.get("FG3M"))
+            if tpm is None:
+                tpm, _ = _parse_made_att(row.get("3PT") or row.get("3PM-3PA") or row.get("FG3M-FG3A"))
+
+            fgm, fga = _parse_made_att(row.get("FG") or row.get("FGM-FGA"))
+            if fgm is None:
+                fgm = _parse_float(row.get("FGM"))
+            if fga is None:
+                fga = _parse_float(row.get("FGA"))
+
+            ftm, fta = _parse_made_att(row.get("FT") or row.get("FTM-FTA"))
+            if ftm is None:
+                ftm = _parse_float(row.get("FTM"))
+            if fta is None:
+                fta = _parse_float(row.get("FTA"))
+
+            if pts is None or reb is None or ast is None:
+                continue
+
+            games_counted += 1
+            tot_pts += pts
+            tot_reb += reb
+            tot_ast += ast
+            tot_stl += stl or 0.0
+            tot_blk += blk or 0.0
+            tot_3pm += tpm or 0.0
+            tot_tov += tov or 0.0
+
+            if fgm is not None and fga is not None:
+                tot_fgm += fgm
+                tot_fga += fga
+            else:
+                fg_pct_val = _parse_float(row.get("FG%"))
+                if fg_pct_val is not None:
+                    fg_pct_samples.append(fg_pct_val * 100.0 if fg_pct_val <= 1.0 else fg_pct_val)
+
+            if ftm is not None and fta is not None:
+                tot_ftm += ftm
+                tot_fta += fta
+            else:
+                ft_pct_val = _parse_float(row.get("FT%"))
+                if ft_pct_val is not None:
+                    ft_pct_samples.append(ft_pct_val * 100.0 if ft_pct_val <= 1.0 else ft_pct_val)
+
+        if games_counted <= 0:
+            _STATS_CACHE[cache_key] = None
+            return None
+
+        fg_pct = (
+            (tot_fgm / tot_fga) * 100.0
+            if tot_fga > 0
+            else (sum(fg_pct_samples) / len(fg_pct_samples) if fg_pct_samples else 0.0)
+        )
+        ft_pct = (
+            (tot_ftm / tot_fta) * 100.0
+            if tot_fta > 0
+            else (sum(ft_pct_samples) / len(ft_pct_samples) if ft_pct_samples else 0.0)
+        )
+
+        result = {
+            "player_id": ath_id,
+            "espn_season_year": espn_year,
+            "season": season,
+            "gp": games_counted,
+            "pts": round(tot_pts / games_counted, 1),
+            "reb": round(tot_reb / games_counted, 1),
+            "ast": round(tot_ast / games_counted, 1),
+            "stl": round(tot_stl / games_counted, 1),
+            "blk": round(tot_blk / games_counted, 1),
+            "fg3m": round(tot_3pm / games_counted, 1),
+            "fg_pct": round(fg_pct, 1),
+            "ft_pct": round(ft_pct, 1),
+            "tov": round(tot_tov / games_counted, 1),
+        }
+        _STATS_CACHE[cache_key] = result
+        return result
+
+    except Exception as e:
+        print(f"[STATS] Error fetching ESPN stats for player {ath_id} (season={season} -> {espn_year}): {e}", flush=True)
+        return None
