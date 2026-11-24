@@ -4,13 +4,20 @@ import flet as ft
 from nba_data import search_player_by_name, get_player_9cat_stats, season_to_espn_year
 from evaluator import evaluate_trade
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+
+# Put your image at <project>/assets/bg.jpg (or set a direct https:// URL).
+# Set to "" (empty string) to disable the background image anytime.
+BACKGROUND_IMAGE_SRC = "bg.jpg"
+
 
 def main(page: ft.Page):
     page.title = "NBA 9-Cat Trade Evaluator"
     page.theme_mode = ft.ThemeMode.DARK
 
-    # Safe padding for page edges on mobile
-    page.padding = ft.Padding.only(left=15, right=15, top=20, bottom=20)
+    # Zero page padding so the background image fills edge-to-edge
+    page.padding = 0
     page.scroll = ft.ScrollMode.AUTO
 
     team_a_players = []
@@ -24,6 +31,7 @@ def main(page: ft.Page):
     season_dropdown = ft.Dropdown(
         label="Select Season",
         value="2026-27",
+        bgcolor=ft.Colors.with_opacity(0.85, ft.Colors.GREY_900),
         options=[
             ft.dropdown.Option("2024-25"),
             ft.dropdown.Option("2025-26"),
@@ -41,10 +49,12 @@ def main(page: ft.Page):
 
     list_a = ft.Column(spacing=10)
     list_b = ft.Column(spacing=10)
-    
+
     def show_toast(msg: str):
-        print(f"[UI TOAST] {msg}")
-        page.open(ft.SnackBar(ft.Text(str(msg))))
+        print(f"[UI TOAST] {msg}", flush=True)
+        page.snack_bar = ft.SnackBar(ft.Text(str(msg)))
+        page.snack_bar.open = True
+        page.update()
 
     def build_suggestions(query: str):
         matches = search_player_by_name(
@@ -83,8 +93,18 @@ def main(page: ft.Page):
         input_b.value = e.selection.value
         autocomplete_b.update()
 
-    input_a = ft.TextField(label="Give Player Name", hint_text="e.g. Stephen Curry", expand=True)
-    input_b = ft.TextField(label="Receive Player Name", hint_text="e.g. Seth Curry", expand=True)
+    input_a = ft.TextField(
+        label="Give Player Name",
+        hint_text="e.g. Stephen Curry",
+        expand=True,
+        bgcolor=ft.Colors.with_opacity(0.75, ft.Colors.GREY_900),
+    )
+    input_b = ft.TextField(
+        label="Receive Player Name",
+        hint_text="e.g. Seth Curry",
+        expand=True,
+        bgcolor=ft.Colors.with_opacity(0.75, ft.Colors.GREY_900),
+    )
 
     autocomplete_a = ft.AutoComplete(
         on_change=handle_search_a,
@@ -110,13 +130,8 @@ def main(page: ft.Page):
         content=result_column,
         padding=15,
         border_radius=8,
-        bgcolor=ft.Colors.GREY_900,
+        bgcolor=ft.Colors.with_opacity(0.85, ft.Colors.GREY_900),
     )
-
-    def show_toast(msg: str):
-        page.snack_bar = ft.SnackBar(ft.Text(str(msg)))
-        page.snack_bar.open = True
-        page.update()
 
     def remove_player(player_data, team: str):
         target_list = team_a_players if team == "A" else team_b_players
@@ -173,6 +188,7 @@ def main(page: ft.Page):
                     ),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 padding=8,
+                bgcolor=ft.Colors.with_opacity(0.75, ft.Colors.GREY_900),
                 border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
                 border_radius=5,
             )
@@ -261,59 +277,83 @@ def main(page: ft.Page):
             page.update()
 
         except Exception as err:
-            print("Evaluation Error Traceback:")
+            print("Evaluation Error Traceback:", flush=True)
             traceback.print_exc()
             show_toast(f"Eval Error: {err}")
 
     input_a.on_submit = lambda e: add_player(e, "A")
     input_b.on_submit = lambda e: add_player(e, "B")
 
+    bg_src = (BACKGROUND_IMAGE_SRC or "").strip()
+    is_url = bg_src.startswith(("http://", "https://"))
+    has_local_asset = bool(bg_src) and not is_url and os.path.exists(os.path.join(ASSETS_DIR, bg_src))
+    use_bg_image = is_url or has_local_asset
+
+    bg_image = (
+        ft.DecorationImage(
+            src=bg_src,
+            fit=ft.BoxFit.COVER,
+        )
+        if use_bg_image
+        else None
+    )
+
     page.add(
-        ft.SafeArea(
-            content=ft.Column([
-                top_bar,
-                ft.Divider(),
-                ft.ResponsiveRow([
-                    ft.Container(
-                        content=ft.Column([
-                            ft.Text("Players Giving (Team A)", size=16, weight=ft.FontWeight.W_600),
-                            ft.Row([
-                                autocomplete_a,
-                                ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "A")),
+        ft.Container(
+            expand=True,
+            bgcolor=ft.Colors.with_opacity(0.65, ft.Colors.BLACK) if use_bg_image else "#121212",
+            image=bg_image,
+            content=ft.SafeArea(
+                padding=ft.Padding.only(left=15, right=15, top=20, bottom=20),
+                content=ft.Column([
+                    top_bar,
+                    ft.Divider(),
+                    ft.ResponsiveRow([
+                        ft.Container(
+                            content=ft.Column([
+                                ft.Text("Players Giving (Team A)", size=16, weight=ft.FontWeight.W_600),
+                                ft.Row([
+                                    autocomplete_a,
+                                    ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "A")),
+                                ]),
+                                list_a,
                             ]),
-                            list_a,
-                        ]),
-                        col={"sm": 6},
-                        padding=10,
-                        border=ft.Border.all(1, ft.Colors.OUTLINE),
-                    ),
-                    ft.Container(
-                        content=ft.Column([
-                            ft.Text("Players Receiving (Team B)", size=16, weight=ft.FontWeight.W_600),
-                            ft.Row([
-                                autocomplete_b,
-                                ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "B")),
+                            col={"sm": 6},
+                            padding=10,
+                            border_radius=8,
+                            bgcolor=ft.Colors.with_opacity(0.72, ft.Colors.GREY_900),
+                            border=ft.Border.all(1, ft.Colors.OUTLINE),
+                        ),
+                        ft.Container(
+                            content=ft.Column([
+                                ft.Text("Players Receiving (Team B)", size=16, weight=ft.FontWeight.W_600),
+                                ft.Row([
+                                    autocomplete_b,
+                                    ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "B")),
+                                ]),
+                                list_b,
                             ]),
-                            list_b,
-                        ]),
-                        col={"sm": 6},
-                        padding=10,
-                        border=ft.Border.all(1, ft.Colors.OUTLINE),
-                    ),
+                            col={"sm": 6},
+                            padding=10,
+                            border_radius=8,
+                            bgcolor=ft.Colors.with_opacity(0.72, ft.Colors.GREY_900),
+                            border=ft.Border.all(1, ft.Colors.OUTLINE),
+                        ),
+                    ]),
+                    ft.Container(height=10),
+                    ft.Row([
+                        ft.Button(content=ft.Text("Evaluate 9-Cat Trade"), on_click=handle_eval),
+                        ft.Button(
+                            content=ft.Text("Clear All Players"),
+                            icon=ft.Icons.CLEAR_ALL,
+                            icon_color=ft.Colors.RED_400,
+                            on_click=clear_all,
+                        ),
+                    ], spacing=10),
+                    ft.Container(height=10),
+                    result_card,
                 ]),
-                ft.Container(height=10),
-                ft.Row([
-                    ft.Button(content=ft.Text("Evaluate 9-Cat Trade"), on_click=handle_eval),
-                    ft.Button(
-                        content=ft.Text("Clear All Players"),
-                        icon=ft.Icons.CLEAR_ALL,
-                        icon_color=ft.Colors.RED_400,
-                        on_click=clear_all,
-                    ),
-                ], spacing=10),
-                ft.Container(height=10),
-                result_card,
-            ])
+            ),
         )
     )
 
@@ -321,13 +361,14 @@ def main(page: ft.Page):
 if __name__ == "__main__":
     is_mobile_packaging = os.environ.get("SERIOUS_PYTHON_SITE_PACKAGES") is not None
     if is_mobile_packaging:
-        ft.app(main)
+        ft.app(main, assets_dir=ASSETS_DIR if os.path.isdir(ASSETS_DIR) else None)
     else:
         port = int(os.environ.get("PORT", 10000))
         os.environ["FLET_SERVER_PORT"] = str(port)
         os.environ["FLET_SERVER_IP"] = "0.0.0.0"
         os.environ["FLET_FORCE_WEB_SERVER"] = "true"
+        assets_arg = ASSETS_DIR if os.path.isdir(ASSETS_DIR) else None
         if os.name == "nt":
-            ft.run(main, port=port, host="0.0.0.0", view=ft.AppView.WEB_BROWSER)
+            ft.run(main, port=port, host="0.0.0.0", view=ft.AppView.WEB_BROWSER, assets_dir=assets_arg)
         else:
-            ft.run(main, port=port, host="0.0.0.0")
+            ft.run(main, port=port, host="0.0.0.0", assets_dir=assets_arg)
