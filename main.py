@@ -9,7 +9,7 @@ ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 
 # Put your image at <project>/assets/bg.jpg (or set a direct https:// URL).
 # Set to "" (empty string) to disable the background image anytime.
-BACKGROUND_IMAGE_SRC = ""
+BACKGROUND_IMAGE_SRC = "bg.jpg"
 
 
 def main(page: ft.Page):
