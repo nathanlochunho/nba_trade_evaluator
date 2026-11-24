@@ -7,7 +7,6 @@ import requests
 
 CURRENT_SEASON = "2026-27"
 
-TEAMS_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams"
 BY_ATHLETE_URL = (
     "https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/statistics/byathlete"
 )
@@ -86,38 +85,6 @@ def _parse_made_att(val: Any) -> tuple[float | None, float | None]:
     return made, att
 
 
-def _extract_athletes_from_teams_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    roster: list[dict[str, Any]] = []
-    seen_ids: set[str] = set()
-
-    for sport in payload.get("sports") or []:
-        for league in sport.get("leagues") or []:
-            for team_wrapper in league.get("teams") or []:
-                team = team_wrapper.get("team") or {}
-                team_abbr = str(team.get("abbreviation") or "").strip()
-                for ath_wrapper in team.get("athletes") or []:
-                    ath = ath_wrapper.get("athlete") or ath_wrapper
-                    ath_id = str(ath.get("id") or "").strip()
-                    full_name = str(ath.get("displayName") or ath.get("fullName") or "").strip()
-                    if not ath_id or not full_name or ath_id in seen_ids:
-                        continue
-                    seen_ids.add(ath_id)
-                    parts = full_name.split(" ", 1)
-                    pos_abbr = str((ath.get("position") or {}).get("abbreviation") or "").strip()
-                    roster.append({
-                        "id": ath_id,
-                        "full_name": full_name,
-                        "first_name": str(ath.get("firstName") or parts[0]).strip(),
-                        "last_name": str(
-                            ath.get("lastName") or (parts[1] if len(parts) > 1 else "")
-                        ).strip(),
-                        "team": team_abbr,
-                        "pos": pos_abbr,
-                        "is_active": True,
-                    })
-    return roster
-
-
 def _extract_athletes_from_byathlete_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
     roster: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
@@ -130,10 +97,6 @@ def _extract_athletes_from_byathlete_payload(payload: dict[str, Any]) -> list[di
             continue
         seen_ids.add(ath_id)
         parts = full_name.split(" ", 1)
-        team_abbr = str(
-            (ath.get("team") or entry.get("team") or {}).get("abbreviation") or ""
-        ).strip()
-        pos_abbr = str((ath.get("position") or {}).get("abbreviation") or "").strip()
         roster.append({
             "id": ath_id,
             "full_name": full_name,
@@ -141,44 +104,45 @@ def _extract_athletes_from_byathlete_payload(payload: dict[str, Any]) -> list[di
             "last_name": str(
                 ath.get("lastName") or (parts[1] if len(parts) > 1 else "")
             ).strip(),
-            "team": team_abbr,
-            "pos": pos_abbr,
             "is_active": True,
         })
     return roster
 
 
 def get_season_players(season: str = CURRENT_SEASON, timeout: float = 15.0) -> list[dict[str, Any]]:
-    """
-    Builds a searchable player directory (with ESPN athlete IDs) for autocomplete & lookup.
-    Pulls from ESPN team rosters first, with statistics/byathlete fallback.
-    """
+    """Builds a searchable player directory (with ESPN athlete IDs) from ESPN byathlete."""
     cache_key = (season or CURRENT_SEASON).strip()
     if cache_key in _PLAYER_CACHE and _PLAYER_CACHE[cache_key]:
         return _PLAYER_CACHE[cache_key]
 
-    roster: list[dict[str, Any]] = []
-    try:
-        resp = requests.get(TEAMS_URL, headers=HEADERS, timeout=timeout)
-        resp.raise_for_status()
-        roster = _extract_athletes_from_teams_payload(resp.json())
-    except Exception as e:
-        print(f"ESPN teams roster fetch failed ({e}), trying byathlete endpoint...")
+    roster_by_id: dict[str, dict[str, Any]] = {}
+    espn_year = season_to_espn_year(cache_key)
 
-    if not roster:
-        try:
-            espn_year = season_to_espn_year(cache_key)
+    try:
+        for page in range(1, 8):
             resp = requests.get(
                 BY_ATHLETE_URL,
-                params={"limit": 500, "page": 1, "season": espn_year},
+                params={"limit": 200, "page": page, "season": espn_year},
                 headers=HEADERS,
                 timeout=timeout,
             )
             resp.raise_for_status()
-            roster = _extract_athletes_from_byathlete_payload(resp.json())
-        except Exception as e:
-            print(f"ESPN byathlete fetch failed ({e}).")
+            data = resp.json()
+            extracted = _extract_athletes_from_byathlete_payload(data)
+            if not extracted:
+                break
 
+            for p in extracted:
+                roster_by_id[p["id"]] = p
+
+            pagination = data.get("pagination") or {}
+            total_pages = int(pagination.get("pageCount") or pagination.get("pages") or page)
+            if page >= total_pages:
+                break
+    except Exception as e:
+        print(f"ESPN byathlete roster fetch error ({e})", flush=True)
+
+    roster = list(roster_by_id.values())
     if roster:
         _PLAYER_CACHE[cache_key] = roster
     return roster
@@ -226,7 +190,6 @@ def _collect_game_stat_rows(
             else labels
         )
 
-        # Event/game entries typically carry 'stats' as a list of values
         stats_list = node.get("stats")
         if isinstance(stats_list, list) and stats_list and not isinstance(stats_list[0], dict):
             if current_labels:
@@ -262,9 +225,9 @@ def get_player_9cat_stats(
     season: str = CURRENT_SEASON,
     timeout: float = 15.0,
 ) -> dict[str, Any] | None:
+    """Fetches a player's game log for `season` and aggregates 9-category per-game averages."""
     ath_id = str(player_id).strip()
     if not ath_id:
-        #print("[DEBUG] Empty player_id passed to get_player_9cat_stats")
         return None
 
     espn_year = season_to_espn_year(season)
@@ -274,42 +237,27 @@ def get_player_9cat_stats(
 
     try:
         url = GAMELOG_URL.format(athlete_id=ath_id)
-        #print(f"\n[DEBUG] GET {url}?season={espn_year}")
         resp = requests.get(
             url,
             params={"season": espn_year},
             headers=HEADERS,
             timeout=timeout,
         )
-        # print(f"[DEBUG] HTTP Status: {resp.status_code}")
         resp.raise_for_status()
         payload = resp.json()
-        #print(f"[DEBUG] Top-level JSON keys: {list(payload.keys())}")
-        # print(f"[DEBUG] Top-level labels: {payload.get('labels')}")
 
         raw_rows: list[tuple[list[str], list[Any]]] = []
         season_types = payload.get("seasonTypes")
         if isinstance(season_types, list) and season_types:
-            # print(f"[DEBUG] seasonTypes count: {len(season_types)}")
-            for idx, st in enumerate(season_types):
-                st_name = str(st.get("displayName") or st.get("name") or "")
-                # print(f"[DEBUG]   seasonType[{idx}] name='{st_name}', keys={list(st.keys())}")
-                if "preseason" in st_name.lower() or "postseason" in st_name.lower():
+            for st in season_types:
+                st_name = str(st.get("displayName") or st.get("name") or "").lower()
+                if "preseason" in st_name or "postseason" in st_name:
                     continue
                 _collect_game_stat_rows(st, payload.get("labels"), raw_rows)
             if not raw_rows:
                 _collect_game_stat_rows(season_types, payload.get("labels"), raw_rows)
         else:
             _collect_game_stat_rows(payload, payload.get("labels"), raw_rows)
-
-        # print(f"[DEBUG] Collected raw_rows count: {len(raw_rows)}")
-        # if raw_rows:
-        #     print(f"[DEBUG] Sample row[0] labels: {raw_rows[0][0]}")
-        #     print(f"[DEBUG] Sample row[0] values: {raw_rows[0][1]}")
-        # else:
-        #     # Print a compact preview of payload so we can see the exact structure
-        #     import json
-        #     print(f"[DEBUG] Payload preview: {json.dumps(payload)[:1200]}")
 
         games_counted = 0
         tot_pts = tot_reb = tot_ast = tot_stl = tot_blk = tot_3pm = tot_tov = 0.0
@@ -320,7 +268,6 @@ def get_player_9cat_stats(
         for labels, vals in raw_rows:
             row = _row_to_stat_dict(labels, vals)
 
-            # Only skip if MIN exists AND explicitly says DNP
             if "MIN" in row:
                 min_raw = str(row.get("MIN") or "").strip().upper()
                 if min_raw in ("DNP", "N/A", "--", ""):
@@ -377,7 +324,6 @@ def get_player_9cat_stats(
                 if ft_pct_val is not None:
                     ft_pct_samples.append(ft_pct_val * 100.0 if ft_pct_val <= 1.0 else ft_pct_val)
 
-        # print(f"[DEBUG] games_counted: {games_counted}")
         if games_counted <= 0:
             _STATS_CACHE[cache_key] = None
             return None
@@ -408,12 +354,9 @@ def get_player_9cat_stats(
             "ft_pct": round(ft_pct, 1),
             "tov": round(tot_tov / games_counted, 1),
         }
-        # print(f"[DEBUG] Parsed 9-cat result: {result}")
         _STATS_CACHE[cache_key] = result
         return result
 
     except Exception as e:
-        import traceback
-        # print(f"[DEBUG] Exception for player {ath_id}: {e}")
-        traceback.print_exc()
+        print(f"Error fetching ESPN stats for player {ath_id} (season={season} -> {espn_year}): {e}", flush=True)
         return None
