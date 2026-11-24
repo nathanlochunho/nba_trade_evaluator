@@ -165,14 +165,14 @@ def search_player_by_name(
     cache_key = (clean_query.lower(), max_results)
     if cache_key in _SEARCH_CACHE:
         cached = _SEARCH_CACHE[cache_key]
-        print(
-            f"[SEARCH] Query='{clean_query}' (cached) -> "
-            f"{[(m['full_name'], m['id']) for m in cached]}",
-            flush=True,
-        )
+        #print(
+            #f"[SEARCH] Query='{clean_query}' (cached) -> "
+            #f"{[(m['full_name'], m['id']) for m in cached]}",
+            #flush=True,
+        #)
         return cached
 
-    print(f"[SEARCH] Query='{clean_query}' | Season='{season}'", flush=True)
+    #print(f"[SEARCH] Query='{clean_query}' | Season='{season}'", flush=True)
 
     results: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
@@ -234,11 +234,11 @@ def search_player_by_name(
     if matches:
         _SEARCH_CACHE[cache_key] = matches
 
-    print(
-        f"[SEARCH] Matches for '{clean_query}': "
-        f"{[(m['full_name'], m['id']) for m in matches]}",
-        flush=True,
-    )
+    #print(
+        #f"[SEARCH] Matches for '{clean_query}': "
+        #f"{[(m['full_name'], m['id']) for m in matches]}",
+        #flush=True,
+    #)
     return matches
 
 
