@@ -304,55 +304,57 @@ def main(page: ft.Page):
             bgcolor=ft.Colors.with_opacity(0.65, ft.Colors.BLACK) if use_bg_image else "#121212",
             image=bg_image,
             content=ft.SafeArea(
-                padding=ft.Padding.only(left=15, right=15, top=20, bottom=20),
-                content=ft.Column([
-                    top_bar,
-                    ft.Divider(),
-                    ft.ResponsiveRow([
-                        ft.Container(
-                            content=ft.Column([
-                                ft.Text("Players Giving (Team A)", size=16, weight=ft.FontWeight.W_600),
-                                ft.Row([
-                                    autocomplete_a,
-                                    ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "A")),
+                content=ft.Container(
+                    padding=ft.Padding.only(left=15, right=15, top=20, bottom=20),
+                    content=ft.Column([
+                        top_bar,
+                        ft.Divider(),
+                        ft.ResponsiveRow([
+                            ft.Container(
+                                content=ft.Column([
+                                    ft.Text("Players Giving (Team A)", size=16, weight=ft.FontWeight.W_600),
+                                    ft.Row([
+                                        autocomplete_a,
+                                        ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "A")),
+                                    ]),
+                                    list_a,
                                 ]),
-                                list_a,
-                            ]),
-                            col={"sm": 6},
-                            padding=10,
-                            border_radius=8,
-                            bgcolor=ft.Colors.with_opacity(0.72, ft.Colors.GREY_900),
-                            border=ft.Border.all(1, ft.Colors.OUTLINE),
-                        ),
-                        ft.Container(
-                            content=ft.Column([
-                                ft.Text("Players Receiving (Team B)", size=16, weight=ft.FontWeight.W_600),
-                                ft.Row([
-                                    autocomplete_b,
-                                    ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "B")),
+                                col={"sm": 6},
+                                padding=10,
+                                border_radius=8,
+                                bgcolor=ft.Colors.with_opacity(0.72, ft.Colors.GREY_900),
+                                border=ft.Border.all(1, ft.Colors.OUTLINE),
+                            ),
+                            ft.Container(
+                                content=ft.Column([
+                                    ft.Text("Players Receiving (Team B)", size=16, weight=ft.FontWeight.W_600),
+                                    ft.Row([
+                                        autocomplete_b,
+                                        ft.IconButton(ft.Icons.ADD, on_click=lambda e: add_player(e, "B")),
+                                    ]),
+                                    list_b,
                                 ]),
-                                list_b,
-                            ]),
-                            col={"sm": 6},
-                            padding=10,
-                            border_radius=8,
-                            bgcolor=ft.Colors.with_opacity(0.72, ft.Colors.GREY_900),
-                            border=ft.Border.all(1, ft.Colors.OUTLINE),
-                        ),
+                                col={"sm": 6},
+                                padding=10,
+                                border_radius=8,
+                                bgcolor=ft.Colors.with_opacity(0.72, ft.Colors.GREY_900),
+                                border=ft.Border.all(1, ft.Colors.OUTLINE),
+                            ),
+                        ]),
+                        ft.Container(height=10),
+                        ft.Row([
+                            ft.Button(content=ft.Text("Evaluate 9-Cat Trade"), on_click=handle_eval),
+                            ft.Button(
+                                content=ft.Text("Clear All Players"),
+                                icon=ft.Icons.CLEAR_ALL,
+                                icon_color=ft.Colors.RED_400,
+                                on_click=clear_all,
+                            ),
+                        ], spacing=10),
+                        ft.Container(height=10),
+                        result_card,
                     ]),
-                    ft.Container(height=10),
-                    ft.Row([
-                        ft.Button(content=ft.Text("Evaluate 9-Cat Trade"), on_click=handle_eval),
-                        ft.Button(
-                            content=ft.Text("Clear All Players"),
-                            icon=ft.Icons.CLEAR_ALL,
-                            icon_color=ft.Colors.RED_400,
-                            on_click=clear_all,
-                        ),
-                    ], spacing=10),
-                    ft.Container(height=10),
-                    result_card,
-                ]),
+                ),
             ),
         )
     )
