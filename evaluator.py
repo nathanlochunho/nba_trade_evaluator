@@ -12,23 +12,23 @@ if not logger.handlers:
     logger.addHandler(handler)
 
 STATS_BENCHMARK = {
-    "fg_pct": {"mean": 0.450222, "std": 0.11818162},
-    "ft_pct": {"mean": 0.71036, "std": 0.22320338},
-    "fg3m":   {"mean": 0.987618,   "std": 0.87863102},
-    "reb":    {"mean": 3.507394,   "std": 2.39051417},
-    "ast":    {"mean": 2.031287,   "std": 1.84985086},
-    "stl":    {"mean": 0.635682,   "std": 0.41164985},
-    "blk":    {"mean": 0.390338,   "std": 0.39436115},
-    "tov":    {"mean": 1.062295,   "std": 0.81751033},
-    "pts":    {"mean": 8.756958,  "std": 6.585474},
+    "fg_pct": {"mean": 0.458949, "std": 0.09201057},
+    "ft_pct": {"mean": 0.73756, "std": 0.17434894},
+    "fg3m":   {"mean": 1.038908,   "std": 0.87754199},
+    "reb":    {"mean": 3.642611,   "std": 2.3762057},
+    "ast":    {"mean": 2.116872,   "std": 1.85458134},
+    "stl":    {"mean": 0.654545,   "std": 0.39652649},
+    "blk":    {"mean": 0.405948,   "std": 0.39413525},
+    "tov":    {"mean": 1.105163,   "std": 0.81038561},
+    "pts":    {"mean": 9.181519,  "std": 6.56128887},
 }
 
 # Volume-weighted percentage impact benchmarks:
 # impact = attempts * (pct_decimal - benchmark_pct_decimal)
 # Update mean/std here if you compute empirical impact distributions from your player pool.
 FG_FT_IMPACT_BENCHMARK = {
-    "fg_impact": {"mean": 0.090159, "std": 0.5272703},
-    "ft_impact": {"mean": 0.116816, "std": 0.28433345},
+    "fg_impact": {"mean": 0.042756, "std": 0.5034265},
+    "ft_impact": {"mean": 0.070403, "std": 0.25263058},
 }
 
 
