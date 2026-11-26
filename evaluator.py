@@ -23,15 +23,47 @@ STATS_BENCHMARK = {
     "pts":    {"mean": 13.58,  "std": 5.97244752},
 }
 
+# Volume-weighted percentage impact benchmarks:
+# impact = attempts * (pct_decimal - benchmark_pct_decimal)
+# Update mean/std here if you compute empirical impact distributions from your player pool.
+FG_FT_IMPACT_BENCHMARK = {
+    "fg_impact": {"mean": 0.0, "std": 0.55},
+    "ft_impact": {"mean": 0.0, "std": 0.45},
+}
+
+
+def _normalize_pct_decimal(raw_val) -> float:
+    val = 0.0 if raw_val is None else float(raw_val)
+    return val / 100.0 if val > 1.0 else val
+
 
 def calculate_player_zscore(player_stats):
-    """Calculates 9-cat Z-scores for a single player."""
+    """Calculates 9-cat Z-scores for a single player using FGA/FTA-weighted FG%/FT% impact."""
     z_scores = {}
-    for cat, bench in STATS_BENCHMARK.items():
+
+    # 1. Volume-weighted FG% impact Z-score
+    fg_pct_dec = _normalize_pct_decimal(player_stats.get("fg_pct", 0))
+    fga_raw = player_stats.get("fga", 0)
+    fga = 0.0 if fga_raw is None else max(0.0, float(fga_raw))
+    bench_fg_pct = STATS_BENCHMARK["fg_pct"]["mean"]
+    fg_impact = fga * (fg_pct_dec - bench_fg_pct)
+    fg_imp_bench = FG_FT_IMPACT_BENCHMARK["fg_impact"]
+    z_scores["fg_pct"] = round((fg_impact - fg_imp_bench["mean"]) / fg_imp_bench["std"], 2)
+
+    # 2. Volume-weighted FT% impact Z-score
+    ft_pct_dec = _normalize_pct_decimal(player_stats.get("ft_pct", 0))
+    fta_raw = player_stats.get("fta", 0)
+    fta = 0.0 if fta_raw is None else max(0.0, float(fta_raw))
+    bench_ft_pct = STATS_BENCHMARK["ft_pct"]["mean"]
+    ft_impact = fta * (ft_pct_dec - bench_ft_pct)
+    ft_imp_bench = FG_FT_IMPACT_BENCHMARK["ft_impact"]
+    z_scores["ft_pct"] = round((ft_impact - ft_imp_bench["mean"]) / ft_imp_bench["std"], 2)
+
+    # 3. Remaining 7 counting/turnover categories
+    for cat in ("fg3m", "reb", "ast", "stl", "blk", "tov", "pts"):
+        bench = STATS_BENCHMARK[cat]
         raw_val = player_stats.get(cat, 0)
         val = 0.0 if raw_val is None else float(raw_val)
-        if cat in ["fg_pct", "ft_pct"] and val > 1.0:
-            val = val / 100.0
 
         z = (val - bench["mean"]) / bench["std"]
         if cat == "tov":
@@ -95,9 +127,9 @@ def evaluate_trade(team_a, team_b):
         diff,
         status,
     )
-    
+
     sys.stdout.flush()
-    
+
     return {
         "status": status,
         "status_color": status_color,
