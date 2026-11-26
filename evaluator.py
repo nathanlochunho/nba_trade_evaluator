@@ -11,24 +11,26 @@ if not logger.handlers:
     handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
     logger.addHandler(handler)
 
+CAT_ORDER = ["pts", "reb", "ast", "stl", "blk", "fg3m", "fg_pct", "ft_pct", "tov"]
+
 STATS_BENCHMARK = {
-    "fg_pct": {"mean": 0.458949, "std": 0.09201057},
-    "ft_pct": {"mean": 0.73756, "std": 0.17434894},
-    "fg3m":   {"mean": 1.038908,   "std": 0.87754199},
-    "reb":    {"mean": 3.642611,   "std": 2.3762057},
-    "ast":    {"mean": 2.116872,   "std": 1.85458134},
-    "stl":    {"mean": 0.654545,   "std": 0.39652649},
-    "blk":    {"mean": 0.405948,   "std": 0.39413525},
-    "tov":    {"mean": 1.105163,   "std": 0.81038561},
-    "pts":    {"mean": 9.181519,  "std": 6.56128887},
+    "fg_pct": {"mean": 0.46342, "std": 0.08312667},
+    "ft_pct": {"mean": 0.747935, "std": 0.14590993},
+    "fg3m":   {"mean": 1.083353,   "std": 0.88206651},
+    "reb":    {"mean": 3.77235,   "std": 2.35958949},
+    "ast":    {"mean": 2.203708,   "std": 1.8693696},
+    "stl":    {"mean": 0.675857,   "std": 0.38882775},
+    "blk":    {"mean": 0.420073,   "std": 0.39593722},
+    "tov":    {"mean": 1.150101,   "std": 0.81113781},
+    "pts":    {"mean": 9.586215,  "std": 6.56177434},
 }
 
 # Volume-weighted percentage impact benchmarks:
 # impact = attempts * (pct_decimal - benchmark_pct_decimal)
 # Update mean/std here if you compute empirical impact distributions from your player pool.
 FG_FT_IMPACT_BENCHMARK = {
-    "fg_impact": {"mean": 0.042756, "std": 0.5034265},
-    "ft_impact": {"mean": 0.070403, "std": 0.25263058},
+    "fg_impact": {"mean": 0.023515, "std": 0.50198732},
+    "ft_impact": {"mean": 0.056056, "std": 0.24486407},
 }
 
 
@@ -91,8 +93,21 @@ def evaluate_trade(team_a, team_b):
         total, cats = calculate_player_zscore(p)
         team_b_players.append({"name": p.get("name", "Unknown"), "total": total, "cats": cats})
 
-    team_a_score = sum(p["total"] for p in team_a_players)
-    team_b_score = sum(p["total"] for p in team_b_players)
+    team_a_cats = {
+        cat: round(sum(p["cats"].get(cat, 0.0) for p in team_a_players), 2)
+        for cat in CAT_ORDER
+    }
+    team_b_cats = {
+        cat: round(sum(p["cats"].get(cat, 0.0) for p in team_b_players), 2)
+        for cat in CAT_ORDER
+    }
+    cat_diffs = {
+        cat: round(team_b_cats[cat] - team_a_cats[cat], 2)
+        for cat in CAT_ORDER
+    }
+
+    team_a_score = round(sum(p["total"] for p in team_a_players), 2)
+    team_b_score = round(sum(p["total"] for p in team_b_players), 2)
 
     diff = round(team_b_score - team_a_score, 2)
     abs_diff = abs(diff)
@@ -133,10 +148,13 @@ def evaluate_trade(team_a, team_b):
     return {
         "status": status,
         "status_color": status_color,
-        "team_a_score": round(team_a_score, 2),
-        "team_b_score": round(team_b_score, 2),
+        "team_a_score": team_a_score,
+        "team_b_score": team_b_score,
         "team_a_players": team_a_players,
         "team_b_players": team_b_players,
+        "team_a_cats": team_a_cats,
+        "team_b_cats": team_b_cats,
+        "cat_diffs": cat_diffs,
         "difference": diff,
         "threshold_used": threshold,
     }

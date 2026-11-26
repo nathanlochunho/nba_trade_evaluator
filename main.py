@@ -2,7 +2,7 @@ import os
 import traceback
 import flet as ft
 from nba_data import search_player_by_name, get_player_9cat_stats, season_to_espn_year
-from evaluator import evaluate_trade
+from evaluator import evaluate_trade, CAT_ORDER
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
@@ -10,6 +10,106 @@ ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 # Put your image at <project>/assets/bg.jpg (or set a direct https:// URL).
 # Set to "" (empty string) to disable the background image anytime.
 BACKGROUND_IMAGE_SRC = "bg.jpg"
+
+CAT_LABELS = {
+    "pts": "PTS",
+    "reb": "REB",
+    "ast": "AST",
+    "stl": "STL",
+    "blk": "BLK",
+    "fg3m": "3PM",
+    "fg_pct": "FG%",
+    "ft_pct": "FT%",
+    "tov": "TO",
+}
+
+
+def build_zscore_diff_table(res: dict) -> ft.Container:
+    team_a_cats = res.get("team_a_cats", {})
+    team_b_cats = res.get("team_b_cats", {})
+    cat_diffs = res.get("cat_diffs", {})
+
+    total_a = float(res.get("team_a_score", 0.0))
+    total_b = float(res.get("team_b_score", 0.0))
+    total_diff = float(res.get("difference", total_b - total_a))
+
+    columns = [
+        ft.DataColumn(ft.Text("Side", weight=ft.FontWeight.BOLD)),
+        *[
+            ft.DataColumn(
+                ft.Text(CAT_LABELS.get(cat, cat.upper()), weight=ft.FontWeight.BOLD),
+                numeric=True,
+            )
+            for cat in CAT_ORDER
+        ],
+        ft.DataColumn(ft.Text("TOTAL", weight=ft.FontWeight.BOLD), numeric=True),
+    ]
+
+    team_a_cells = [
+        ft.DataCell(ft.Text("Team A", weight=ft.FontWeight.BOLD)),
+        *[ft.DataCell(ft.Text(f"{float(team_a_cats.get(cat, 0.0)):+.2f}")) for cat in CAT_ORDER],
+        ft.DataCell(ft.Text(f"{total_a:+.2f}", weight=ft.FontWeight.BOLD)),
+    ]
+
+    team_b_cells = [
+        ft.DataCell(ft.Text("Team B", weight=ft.FontWeight.BOLD)),
+        *[ft.DataCell(ft.Text(f"{float(team_b_cats.get(cat, 0.0)):+.2f}")) for cat in CAT_ORDER],
+        ft.DataCell(ft.Text(f"{total_b:+.2f}", weight=ft.FontWeight.BOLD)),
+    ]
+
+    diff_cells = [ft.DataCell(ft.Text("Diff (B-A)", weight=ft.FontWeight.BOLD))]
+    for cat in CAT_ORDER:
+        d_val = float(cat_diffs.get(cat, 0.0))
+        if d_val > 0.05:
+            diff_color = ft.Colors.GREEN_400
+        elif d_val < -0.05:
+            diff_color = ft.Colors.RED_400
+        else:
+            diff_color = ft.Colors.GREY_300
+
+        diff_cells.append(
+            ft.DataCell(
+                ft.Text(
+                    f"{d_val:+.2f}",
+                    weight=ft.FontWeight.BOLD,
+                    color=diff_color,
+                )
+            )
+        )
+
+    total_diff_color = (
+        ft.Colors.GREEN_400
+        if total_diff > 0
+        else (ft.Colors.RED_400 if total_diff < 0 else ft.Colors.GREY_300)
+    )
+    diff_cells.append(
+        ft.DataCell(
+            ft.Text(
+                f"{total_diff:+.2f}",
+                weight=ft.FontWeight.BOLD,
+                color=total_diff_color,
+            )
+        )
+    )
+
+    table = ft.DataTable(
+        columns=columns,
+        rows=[
+            ft.DataRow(cells=team_a_cells),
+            ft.DataRow(cells=team_b_cells),
+            ft.DataRow(cells=diff_cells),
+        ],
+        column_spacing=14,
+        horizontal_margin=10,
+        heading_row_height=36,
+        data_row_min_height=34,
+        data_row_max_height=38,
+    )
+
+    return ft.Container(
+        content=ft.Row([table], scroll=ft.ScrollMode.AUTO),
+        padding=ft.Padding.only(top=6),
+    )
 
 
 def main(page: ft.Page):
@@ -272,6 +372,9 @@ def main(page: ft.Page):
                 ft.Text(f"Team A Total Z-Score: {res.get('team_a_score', 0):+.2f}"),
                 ft.Text(f"Team B Total Z-Score: {res.get('team_b_score', 0):+.2f}"),
                 ft.Text(f"Net Z-Score Difference: {res.get('difference', 0):+.2f}"),
+                ft.Divider(),
+                ft.Text("Category Z-Score Breakdown (Team B − Team A)", size=15, weight=ft.FontWeight.W_600),
+                build_zscore_diff_table(res),
             ]
 
             result_column.controls = eval_controls

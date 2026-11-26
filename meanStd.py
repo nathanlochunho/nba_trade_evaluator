@@ -9,7 +9,7 @@ SEASONS = ["2021-22","2022-23","2023-24", "2024-25", "2025-26"]
 DDOF = 1
 
 # Optional minimum games played filter (set to 0 to include every player in the endpoint)
-MIN_GP = 5
+MIN_GP = 10
 
 
 def calc_mean_std(values: list[float], ddof: int = 1) -> tuple[float, float]:
