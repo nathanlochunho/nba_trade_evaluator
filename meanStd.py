@@ -3,13 +3,13 @@ import time
 from nba_api.stats.endpoints import LeagueDashPlayerStats
 
 # Update this list each year (e.g., add "2026-27" once enough games are played)
-SEASONS = ["2023-24", "2024-25", "2025-26"]
+SEASONS = ["2021-22","2022-23","2023-24", "2024-25", "2025-26"]
 
 # Use sample std (ddof=1) or population std (ddof=0) to match your existing convention
 DDOF = 1
 
 # Optional minimum games played filter (set to 0 to include every player in the endpoint)
-MIN_GP = 0
+MIN_GP = 5
 
 
 def calc_mean_std(values: list[float], ddof: int = 1) -> tuple[float, float]:
