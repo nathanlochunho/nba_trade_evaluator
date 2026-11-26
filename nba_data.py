@@ -169,7 +169,7 @@ def _extract_season_avg_from_payload(
     season: str,
     espn_year: int,
 ) -> dict[str, Any] | None:
-    """Extracts pre-computed season averages for `target_id` from a byathlete payload."""
+    """Extracts pre-computed season averages (including FGA/FTA) from a byathlete payload."""
     top_labels = [str(x).strip().upper() for x in (payload.get("labels") or [])]
 
     for entry in payload.get("athletes") or []:
@@ -219,13 +219,29 @@ def _extract_season_avg_from_payload(
         if pts is None and reb is None and ast is None:
             return None
 
+        fgm_val, fga_val = _parse_made_att(row.get("FG") or row.get("FGM-FGA"))
+        if fga_val is None:
+            fga_val = _parse_float(row.get("FGA"))
+        if fgm_val is None:
+            fgm_val = _parse_float(row.get("FGM"))
+
+        ftm_val, fta_val = _parse_made_att(row.get("FT") or row.get("FTM-FTA"))
+        if fta_val is None:
+            fta_val = _parse_float(row.get("FTA"))
+        if ftm_val is None:
+            ftm_val = _parse_float(row.get("FTM"))
+
         fg_pct = _parse_float(row.get("FG%"))
         if fg_pct is not None and fg_pct <= 1.0:
             fg_pct *= 100.0
+        elif fg_pct is None and fgm_val is not None and fga_val and fga_val > 0:
+            fg_pct = (fgm_val / fga_val) * 100.0
 
         ft_pct = _parse_float(row.get("FT%"))
         if ft_pct is not None and ft_pct <= 1.0:
             ft_pct *= 100.0
+        elif ft_pct is None and ftm_val is not None and fta_val and fta_val > 0:
+            ft_pct = (ftm_val / fta_val) * 100.0
 
         gp_val = _parse_float(row.get("GP"))
 
@@ -242,7 +258,9 @@ def _extract_season_avg_from_payload(
             "blk": round(_parse_float(row.get("BLK")) or 0.0, 1),
             "fg3m": round(_parse_float(row.get("3PM") or row.get("FG3M")) or 0.0, 1),
             "fg_pct": round(fg_pct or 0.0, 1),
+            "fga": round(fga_val or 0.0, 1),
             "ft_pct": round(ft_pct or 0.0, 1),
+            "fta": round(fta_val or 0.0, 1),
             "tov": round(_parse_float(row.get("TO") or row.get("TOV")) or 0.0, 1),
         }
 
@@ -400,7 +418,7 @@ def _compute_stats_from_gamelog(
     espn_year: int,
     timeout: float = 15.0,
 ) -> dict[str, Any] | None:
-    """Fallback: aggregates 9-category per-game averages from ESPN gamelog."""
+    """Fallback: aggregates 9-category per-game averages + FGA/FTA from ESPN gamelog."""
     url = GAMELOG_URL.format(athlete_id=ath_id)
     resp = requests.get(
         url,
@@ -477,6 +495,8 @@ def _compute_stats_from_gamelog(
             tot_fgm += fgm
             tot_fga += fga
         else:
+            if fga is not None:
+                tot_fga += fga
             fg_pct_val = _parse_float(row.get("FG%"))
             if fg_pct_val is not None:
                 fg_pct_samples.append(fg_pct_val * 100.0 if fg_pct_val <= 1.0 else fg_pct_val)
@@ -485,6 +505,8 @@ def _compute_stats_from_gamelog(
             tot_ftm += ftm
             tot_fta += fta
         else:
+            if fta is not None:
+                tot_fta += fta
             ft_pct_val = _parse_float(row.get("FT%"))
             if ft_pct_val is not None:
                 ft_pct_samples.append(ft_pct_val * 100.0 if ft_pct_val <= 1.0 else ft_pct_val)
@@ -516,7 +538,9 @@ def _compute_stats_from_gamelog(
         "blk": round(tot_blk / games_counted, 1),
         "fg3m": round(tot_3pm / games_counted, 1),
         "fg_pct": round(fg_pct, 1),
+        "fga": round(tot_fga / games_counted, 1),
         "ft_pct": round(ft_pct, 1),
+        "fta": round(tot_fta / games_counted, 1),
         "tov": round(tot_tov / games_counted, 1),
     }
 
