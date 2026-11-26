@@ -176,7 +176,8 @@ def main(page: ft.Page):
                         ft.Text(
                             f"PTS: {p.get('pts',0)} | REB: {p.get('reb',0)} | AST: {p.get('ast',0)} | "
                             f"STL: {p.get('stl',0)} | BLK: {p.get('blk',0)} | 3PM: {p.get('fg3m',0)} | "
-                            f"FG%: {p.get('fg_pct',0)} | FT%: {p.get('ft_pct',0)} | TO: {p.get('tov',0)}",
+                            f"FG%: {p.get('fg_pct',0)} (FGA: {p.get('fga',0)}) | "
+                            f"FT%: {p.get('ft_pct',0)} (FTA: {p.get('fta',0)}) | TO: {p.get('tov',0)}",
                             size=12,
                         ),
                     ], expand=True),
