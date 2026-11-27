@@ -3,13 +3,16 @@ import time
 from nba_api.stats.endpoints import LeagueDashPlayerStats
 
 # Update this list each year (e.g., add "2026-27" once enough games are played)
-SEASONS = ["2021-22","2022-23","2023-24", "2024-25", "2025-26"]
+SEASONS = ["2021-22", "2022-23", "2023-24", "2024-25", "2025-26"]
 
-# Use sample std (ddof=1) or population std (ddof=0) to match your existing convention
-DDOF = 1
+# Filter out players whose season average minutes per game is under 10.0
+MIN_AVG_MINUTES = 10.0
 
-# Optional minimum games played filter (set to 0 to include every player in the endpoint)
+# Optional minimum games played filter (set to 0 to keep all players meeting MIN_AVG_MINUTES)
 MIN_GP = 10
+
+# Sample std (ddof=1) or population std (ddof=0)
+DDOF = 1
 
 
 def calc_mean_std(values: list[float], ddof: int = 1) -> tuple[float, float]:
@@ -23,10 +26,21 @@ def calc_mean_std(values: list[float], ddof: int = 1) -> tuple[float, float]:
     return mean, math.sqrt(variance)
 
 
-def fetch_all_seasons(seasons: list[str], min_gp: int = 0, sleep_sec: float = 1.0) -> list[dict]:
+def _to_float(val) -> float:
+    if val is None or val == "":
+        return 0.0
+    return float(val)
+
+
+def fetch_all_seasons(
+    seasons: list[str],
+    min_avg_minutes: float = 10.0,
+    min_gp: int = 0,
+    sleep_sec: float = 1.0,
+) -> list[dict]:
     records: list[dict] = []
 
-    for season in seasons:
+    for idx, season in enumerate(seasons):
         resp = LeagueDashPlayerStats(
             season=season,
             season_type_all_star="Regular Season",
@@ -34,37 +48,51 @@ def fetch_all_seasons(seasons: list[str], min_gp: int = 0, sleep_sec: float = 1.
             timeout=30,
         )
         df = resp.get_data_frames()[0]
-        print(f"Fetched {len(df)} rows for {season}")
+        kept_in_season = 0
 
         for _, row in df.iterrows():
-            gp = float(row.get("GP") or 0.0)
-            if gp < min_gp:
+            avg_min = _to_float(row.get("MIN"))
+            gp = _to_float(row.get("GP"))
+
+            if avg_min < min_avg_minutes or gp < min_gp:
                 continue
 
             records.append({
                 "season": season,
-                "fga": float(row.get("FGA") or 0.0),
-                "fta": float(row.get("FTA") or 0.0),
-                "fg_pct": float(row.get("FG_PCT") or 0.0),  # already 0.0 - 1.0 in nba_api
-                "ft_pct": float(row.get("FT_PCT") or 0.0),  # already 0.0 - 1.0 in nba_api
-                "fg3m": float(row.get("FG3M") or 0.0),
-                "reb": float(row.get("REB") or 0.0),
-                "ast": float(row.get("AST") or 0.0),
-                "stl": float(row.get("STL") or 0.0),
-                "blk": float(row.get("BLK") or 0.0),
-                "tov": float(row.get("TOV") or 0.0),
-                "pts": float(row.get("PTS") or 0.0),
+                "min": avg_min,
+                "gp": gp,
+                "fga": _to_float(row.get("FGA")),
+                "fta": _to_float(row.get("FTA")),
+                "fg_pct": _to_float(row.get("FG_PCT")),  # already 0.0 - 1.0 in nba_api
+                "ft_pct": _to_float(row.get("FT_PCT")),  # already 0.0 - 1.0 in nba_api
+                "fg3m": _to_float(row.get("FG3M")),
+                "reb": _to_float(row.get("REB")),
+                "ast": _to_float(row.get("AST")),
+                "stl": _to_float(row.get("STL")),
+                "blk": _to_float(row.get("BLK")),
+                "tov": _to_float(row.get("TOV")),
+                "pts": _to_float(row.get("PTS")),
             })
+            kept_in_season += 1
 
-        time.sleep(sleep_sec)
+        print(
+            f"Season {season}: kept {kept_in_season}/{len(df)} players with MIN >= {min_avg_minutes:.1f}",
+            flush=True,
+        )
+
+        if idx < len(seasons) - 1:
+            time.sleep(sleep_sec)
 
     return records
 
 
 def main():
-    records = fetch_all_seasons(SEASONS, min_gp=MIN_GP)
+    records = fetch_all_seasons(
+        SEASONS,
+        min_avg_minutes=MIN_AVG_MINUTES,
+        min_gp=MIN_GP,
+    )
 
-    # 1. Standard per-game / percentage benchmarks across all players
     raw_cats = ["fg_pct", "ft_pct", "fg3m", "reb", "ast", "stl", "blk", "tov", "pts"]
     stats_benchmark = {}
 
@@ -76,9 +104,6 @@ def main():
             "std": round(std_val, 8),
         }
 
-    # 2. Volume-weighted FG% and FT% impact benchmarks:
-    #    fg_impact = fga * (fg_pct - bench_fg_pct)
-    #    ft_impact = fta * (ft_pct - bench_ft_pct)
     bench_fg = stats_benchmark["fg_pct"]["mean"]
     bench_ft = stats_benchmark["ft_pct"]["mean"]
 
