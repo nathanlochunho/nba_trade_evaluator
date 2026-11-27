@@ -6,10 +6,10 @@ from nba_api.stats.endpoints import LeagueDashPlayerStats
 SEASONS = ["2021-22", "2022-23", "2023-24", "2024-25", "2025-26"]
 
 # Filter out players whose season average minutes per game is under 10.0
-MIN_AVG_MINUTES = 10.0
+MIN_AVG_MINUTES = 15.0
 
 # Optional minimum games played filter (set to 0 to keep all players meeting MIN_AVG_MINUTES)
-MIN_GP = 10
+MIN_GP = 20
 
 # Sample std (ddof=1) or population std (ddof=0)
 DDOF = 1
